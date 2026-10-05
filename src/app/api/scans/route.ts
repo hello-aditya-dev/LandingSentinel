@@ -55,6 +55,12 @@ export const POST = route(async (req) => {
       importBatchId: parsed.data.importBatchId ?? null,
       label: parsed.data.label ?? null,
       variant: parsed.data.variant,
+      // The public demo's "after fixes" state appears immediately: staged
+      // delays exist to make the FIRST preflight feel real; the repaired
+      // state is a comparison view, not a re-enactment.
+      ...(ctx.scanEngine === "demo-fixture" && parsed.data.variant === "fixed"
+        ? { fixtureDelays: false }
+        : {}),
     });
     return ok(result, 201);
   } catch (err) {

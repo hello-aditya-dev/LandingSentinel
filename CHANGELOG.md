@@ -1,5 +1,145 @@
 # Changelog
 
+## 0.1.2 — Production Polish
+
+Final production-identity and experience pass over the hardened release. No
+architecture changes, no scanner-rule changes, no new integrations — the
+working core is untouched and the test suite is unchanged at 175 tests.
+
+### Product identity (new)
+
+- **LandingSentinel mark:** an original inspection-sheet symbol — campaign
+  paper with one folded corner, an inspection-registration cross and a
+  critical-red sentinel marker. Ships as `src/app/icon.svg` (crisp vector
+  favicon), `src/app/apple-icon.tsx` (180×180 Apple touch icon),
+  `src/app/icon.tsx` (512×512 high-resolution icon) and a shared React
+  component (`SentinelMark`) used by the marketing header, app shell,
+  sign-in screen and footer. Verified legible at 16px favicon size.
+- **Open Graph social card:** a 1200×630 product preview generated at the
+  `src/app/opengraph-image.tsx` metadata route using the product's own
+  typefaces (Source Serif 4 / Inter / IBM Plex Mono committed as TTFs under
+  `src/og/fonts/`). The card shows the real product composition —
+  £84,260 / £11,840 figures, a DO NOT LAUNCH stamp, three Money Map rows —
+  labelled `SYNTHETIC DEMO DATA`. Verified: 200, `image/png`, no clipping.
+
+### Metadata (new)
+
+- Full document metadata: title `LandingSentinel — Paid-Media Landing Page
+  Preflight`, product description, application name, Open Graph
+  (`type: website`, title, description, image with width/height/alt) and
+  Twitter `summary_large_image` card derived from the same image — one
+  source, no contradictory duplicates.
+- Canonical URL strategy via `NEXT_PUBLIC_SITE_URL` (Vercel `VERCEL_URL`
+  supported; `http://localhost:3000` fallback in development; absolute-URL
+  metadata is omitted in production when unconfigured rather than pointing
+  at a domain that does not exist). Documented in CONFIGURATION.md.
+- `themeColor` paper tone, `robots.txt` (`src/app/robots.ts`) and
+  `sitemap.xml` (`src/app/sitemap.ts`). The sitemap lists only the homepage
+  — hash-routed views are not fabricated as server URLs.
+
+### Experience polish
+
+- **404:** a paper-styled `not-found` view (`404 / DESTINATION NOT FOUND`)
+  with Return home / Open live demo actions — no default Next.js error page.
+- **Error boundaries:** `error.tsx` (APPLICATION / INTERRUPTED — retry-safe,
+  saved state preserved, digest reference) and `global-error.tsx` last
+  resort, both in the paper visual system.
+- **Session expiry:** AUTH_REQUIRED API responses now drive a clean
+  transition to the sign-in screen over the current route (preserved
+  destination), with all cached protected queries dropped — no stale
+  protected data, no broken API errors. Sign-out removes protected queries
+  from the client cache instead of merely invalidating them.
+- **Sign-in screen:** restructured to the product identity — `CONTROL
+  ACCESS`, mark + product name, focused copy, exact `The password is
+  incorrect.` error, loading state that blocks duplicate submissions.
+- **Partial scans:** an explicit SCAN / PARTIAL panel — completed/failed
+  counts, per-destination failure reasons, cause-specific guidance and a
+  Start-another-scan action. Completed findings are never hidden.
+- **Zero-issue scans:** a clean scan now states `0 CRITICAL · 0 WARNINGS —
+  All inspected destinations passed the current preflight rules.`
+- **Money Map empty filters:** specialised copy (`No critical destinations.
+  This scan did not produce a confirmed critical finding.`).
+- **Reports:** `View report` now opens the existing report instead of
+  silently generating a duplicate; `Generate report` shows a real
+  `Generating report…` state. White-label `logoUrl` (collected in Settings
+  since 0.1.0 but previously unused) now renders on the report masthead.
+- **Branding settings:** client-side validation with inline errors (empty
+  product/agency names, non-URL logo links, non-hex accents, over-length
+  values) and a live logo preview chip; invalid values can no longer be
+  silently dropped by the save path.
+- **Checkout CTA:** with `NEXT_PUBLIC_CHECKOUT_URL` unset, production shows
+  the licence CTA only (no dead buy button); development shows the
+  configuration note.
+- Async controls audited: Run scan → `Starting scan…`, Import →
+  `Importing…`, Branding → `Saving…`, Demo branding → `Saving…`, all with
+  duplicate-submission guards.
+
+### Zero-friction public experience (0.1.2 amendment)
+
+- **Try LandingSentinel:** the primary homepage CTA opens the synthetic
+  campaign demo immediately — no account, no setup, no onboarding. The
+  demo leads with the portfolio (32 rows · 22 destinations · £84,260) and
+  one dominant RUN PREFLIGHT action; the staged fixture scan completes in
+  ~10–13 seconds with real per-destination progress, then the reveal —
+  DO NOT LAUNCH, the headline numbers, and FIX THESE FIRST (the Money Map
+  in plain language for first-time visitors).
+- **Per-session demo isolation:** every anonymous visitor gets their own
+  demo workspace (`demo:s:{id}`, assigned by middleware via an HttpOnly
+  `ls_demo_sid` cookie). One visitor's scans, resets and rebrands can
+  never affect another. Session workspaces are created + seeded inside a
+  single transaction (racing first-visit requests can never observe a
+  half-seeded demo) and are cleaned up after 24 hours.
+- **View after fixes on demand:** the repaired state (LAUNCH READY, 0
+  critical / 0 warnings / 22 healthy) is generated in the visitor's own
+  session on first request — instantly, without replaying staged delays —
+  and deduplicated so it is only ever created once per session.
+- **One-click evidence:** Money Map rows offer "View evidence" in the
+  demo; the forensic finding view carries the full redirect chain,
+  tracker table and spend context. A subtle guided path (no tour, no
+  tooltips) signposts the natural next beat: evidence → "Next: See the
+  campaign report" → "Next: See the repaired state".
+- **White-label playground, browser-local:** the demo branding playground
+  (agency name, product title, accent, report footer) now edits a
+  browser-local store — "These demo changes stay in your browser and are
+  not saved" — applied live to the demo report via a client-side merge;
+  the server-side branding of every session workspace stays untouched.
+- **See campaign import:** the demo signposts the real import wizard with
+  the synthetic sample CSV one click away (load → mapping → review →
+  aggregation), fixed to run fully in the public demo scope.
+- **One-page public checker (`/#/scan`):** a second homepage CTA runs the
+  REAL scanning engine against one public URL the visitor provides, with
+  optional platform / expected-tracker / associated-spend context. The
+  route is deliberately constrained: exactly one http(s) URL, every
+  existing SSRF control (DNS resolution, private/loopback/metadata
+  rejection, per-hop redirect revalidation), scanner timeout/redirect/
+  body limits, no caller headers or cookies, 3 evaluations per IP per
+  hour plus a global abuse ceiling, and fully ephemeral processing —
+  nothing is stored, no workspace is involved, the URL is never logged.
+  The compact result shows destination status, HTTP response, redirects,
+  campaign-parameter survival, tracker status (with GTM honesty note),
+  content checks and findings, then bridges to the full demo and the
+  £349 licence. Disable per deployment with
+  `NEXT_PUBLIC_PAGE_CHECK_ENABLED=false`.
+- **Homepage restructure:** Try LandingSentinel (primary) · Scan one
+  landing page (secondary) · View source package (tertiary); a "Not a
+  screenshot demo" proof section with trust bar directly after the hero;
+  "What £349 buys" build-vs-buy comparison and the founding-agency price
+  (£349 once — no recurring LandingSentinel licence fee) after value has
+  been demonstrated. No superlative claims added.
+- **Demo bar:** every demo-scoped application view carries a persistent
+  "DEMO CONTROLS" link back to the demo sheet, alongside the standing
+  SYNTHETIC DEMO DATA label.
+
+### Validation
+
+- Full production journey re-run after every change (see worklog): homepage,
+  demo scan, findings, report, after-fixes, reset, sign-in, real CSV import,
+  real scanner, Money Map, evidence, branding, refresh persistence,
+  sign-out/sign-in.
+- Responsive passes at 390/430/768/1280/1440/1728 with programmatic
+  horizontal-overflow checks on every view; keyboard focus-visible ring
+  verified; `prefers-reduced-motion` honoured by the global motion guard.
+
 ## 0.1.1 — Commercial hardening release
 
 Hardening of the founding release for commercial distribution: PostgreSQL as

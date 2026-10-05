@@ -79,7 +79,7 @@ export function ImportWorkflowView({ scope, demo }: { scope: "demo" | "app"; dem
       setCsvText(text);
       setFilename(name);
       try {
-        const data = await api<PreviewData>("/api/import/preview", {
+        const data = await api<PreviewData>(withScope("/api/import/preview", scope), {
           method: "POST",
           body: JSON.stringify({ csvText: text, filename: name }),
         });
@@ -97,7 +97,7 @@ export function ImportWorkflowView({ scope, demo }: { scope: "demo" | "app"; dem
         setStep("file");
       }
     },
-    []
+    [scope]
   );
 
   const onFile = useCallback(

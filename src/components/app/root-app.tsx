@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useMemo } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useRouter, scopeForRoute } from "@/store/router";
 import { AppShell } from "./app-shell";
 import { DashboardView } from "./dashboard";
@@ -20,6 +20,7 @@ import { ReportView } from "./report-view";
 import { ClientsView } from "./clients";
 import { SettingsView } from "./settings";
 import { DemoView } from "../marketing/demo-view";
+import { ScanOneView } from "../marketing/scan-one-view";
 import { HomeView } from "../marketing/home-view";
 import { DocsView } from "../marketing/docs-view";
 import { LicenseView } from "../marketing/license-view";
@@ -62,7 +63,9 @@ function RouteView({ route }: { route: ReturnType<typeof useRouter.getState>["ro
     case "home":
       return <HomeView />;
     case "demo":
-      return <DemoView />;
+      return <DemoView panel={route.panel} />;
+    case "scanOne":
+      return <ScanOneView />;
     case "docs":
       return <DocsView />;
     case "license":
@@ -76,10 +79,25 @@ function RouteView({ route }: { route: ReturnType<typeof useRouter.getState>["ro
 
 function AppFrame({ route }: { route: ReturnType<typeof useRouter.getState>["route"] }) {
   const scope = scopeForRoute(route);
+  const queryClient = useQueryClient();
   const { data: brandingData } = useBranding(scope);
   const { data: dashboard } = useDashboard(scope);
   const { data: session } = useSession(scope);
   const logout = useLogout(scope);
+
+  // Session expiry mid-view: any API call that returns AUTH_REQUIRED fires
+  // this event (see lib/client/api.ts). Drop every cached protected query —
+  // no stale protected information stays in memory — and refresh the session
+  // so the shell renders the sign-in screen over the current route. The hash
+  // route is preserved, so signing in returns to the intended view.
+  useEffect(() => {
+    const onAuthRequired = () => {
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "session" });
+      queryClient.invalidateQueries({ queryKey: ["session"] });
+    };
+    window.addEventListener("landingsentinel:auth-required", onAuthRequired);
+    return () => window.removeEventListener("landingsentinel:auth-required", onAuthRequired);
+  }, [queryClient]);
 
   const branding = brandingData?.branding;
   const demo = dashboard?.scanEngine === "demo-fixture";

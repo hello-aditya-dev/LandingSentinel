@@ -1,6 +1,11 @@
 # LandingSentinel
 
-Paid-media landing-page preflight. Version 0.1.1 — see [CHANGELOG.md](CHANGELOG.md).
+Paid-media landing-page preflight. Version 0.1.2 — see [CHANGELOG.md](CHANGELOG.md).
+
+Try the product with **no account**: the synthetic campaign demo runs the
+full workflow (import → preflight → evidence → report → after-fixes), and the
+one-page checker runs the **real scanner** against any public URL you give
+it — rate-limited, SSRF-hardened, nothing stored.
 
 LandingSentinel checks the landing pages your paid campaigns point at *before* the
 campaign goes live. You import a campaign CSV export (Google Ads, Meta, TikTok,

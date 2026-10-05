@@ -13,7 +13,6 @@ import { StatusStamp, SeverityBadge } from "@/components/paper/stamp";
 import { Money, EvidenceRow } from "@/components/paper/evidence";
 import { Button } from "@/components/ui/button";
 import {
-  Compass,
   ArrowRight,
   FileSearch,
   Radar,
@@ -28,6 +27,7 @@ import {
   OctagonX,
 } from "lucide-react";
 import { DEMO_DESTINATIONS } from "@/lib/scanner/demo-fixtures";
+import { SentinelMark } from "@/components/paper/sentinel-mark";
 import { cn } from "@/lib/utils";
 
 const totalSpend = 84_260_00;
@@ -63,7 +63,7 @@ export function HomeView() {
       <header className="sticky top-0 z-30 border-b border-hairline bg-paper/95 backdrop-blur-[2px]">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2.5">
-            <Compass size={20} strokeWidth={2} aria-hidden="true" />
+            <SentinelMark size={22} />
             <span className="font-display text-[17px] font-bold leading-none tracking-tight">{PRODUCT.name}</span>
           </div>
           <nav className="flex items-center gap-1 sm:gap-2" aria-label="Site">
@@ -74,7 +74,7 @@ export function HomeView() {
               Licence
             </button>
             <Button size="sm" variant="outline" onClick={() => navigate({ view: "demo" })} className="gap-2">
-              Open live demo
+              Try LandingSentinel
               <ArrowRight size={14} aria-hidden="true" />
             </Button>
           </nav>
@@ -97,13 +97,25 @@ export function HomeView() {
               <p className="text-[13px] text-ink-3">Own the source. Rebrand it. Deploy it yourself.</p>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <Button size="lg" onClick={() => navigate({ view: "demo" })} className="gap-2 rounded-[2px] px-6 py-3 text-[15px]">
-                  Open live demo <ArrowRight size={16} aria-hidden="true" />
+                  Try LandingSentinel <ArrowRight size={16} aria-hidden="true" />
                 </Button>
-                <Button size="lg" variant="outline" onClick={() => navigate({ view: "license" })} className="rounded-[2px] px-6 py-3 text-[15px]">
-                  View agency licence
-                </Button>
+                {PRODUCT.pageCheckEnabled ? (
+                  <Button size="lg" variant="outline" onClick={() => navigate({ view: "scanOne" })} className="rounded-[2px] px-6 py-3 text-[15px]">
+                    Scan one landing page
+                  </Button>
+                ) : null}
               </div>
-              <p className="text-[12px] text-ink-3">No registration required for the demo. Synthetic data only.</p>
+              <p className="text-[12px] text-ink-3">
+                No account required · Synthetic campaign data
+                {PRODUCT.pageCheckEnabled ? " · Or check one real page above" : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate({ view: "docs" })}
+                className="micro-label mt-1 inline-flex items-center gap-1.5 text-ink-2 underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-ink"
+              >
+                View source package <ArrowRight size={11} aria-hidden="true" />
+              </button>
             </div>
 
             {/* Hero visual: the actual product control sheet */}
@@ -142,6 +154,50 @@ export function HomeView() {
                 <StatusStamp status="DO_NOT_LAUNCH" size="lg" rotation={-4} />
               </div>
             </Sheet>
+          </div>
+        </section>
+        {/* ---------------- NOT A SCREENSHOT DEMO ---------------- */}
+        <section className="border-b border-hairline bg-paper-raised">
+          <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[1fr_1fr] lg:py-12">
+            <div>
+              <MicroLabel>PRODUCT PROOF</MicroLabel>
+              <h2 className="font-display mt-2 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
+                Not a screenshot demo.
+              </h2>
+              <div className="mt-4 space-y-2 border-l-2 border-hairline-strong pl-4 text-[14px] leading-relaxed text-ink-2">
+                <p>The public campaign demo uses synthetic data so anyone can explore it safely.</p>
+                <p>The one-page checker uses the real scanning engine against the public URL you provide.</p>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button size="sm" onClick={() => navigate({ view: "demo" })} className="gap-2">
+                  Try LandingSentinel <ArrowRight size={13} aria-hidden="true" />
+                </Button>
+                {PRODUCT.pageCheckEnabled ? (
+                  <Button size="sm" variant="outline" onClick={() => navigate({ view: "scanOne" })} className="gap-2">
+                    Scan one landing page
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex flex-col justify-center gap-3 border border-hairline bg-paper px-5 py-5">
+              <MicroLabel>TRUST BAR</MicroLabel>
+              <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                {[
+                  "Real scanner",
+                  "175 automated tests",
+                  "PostgreSQL",
+                  "No paid scanning API required",
+                  "White-label",
+                  "Complete source",
+                  "Self-hosted",
+                ].map((fact) => (
+                  <li key={fact} className="flex items-start gap-2 text-[13px] text-ink-2">
+                    <ShieldCheck size={13} className="mt-0.5 shrink-0 text-healthy" aria-hidden="true" />
+                    {fact}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
 
@@ -325,12 +381,50 @@ export function HomeView() {
               </div>
 
               {/* Offer */}
-              <div className="relative">
-                <Sheet label="OFFER / FOUNDING RELEASE" className="h-full">
+              <div className="relative flex flex-col gap-4">
+                <Sheet label="VALUE / BUILD-VS-BUY" className="h-full">
+                  <div className="px-5 py-5">
+                    <h3 className="font-display text-lg font-bold">What £349 buys</h3>
+                    <p className="mt-1 max-w-sm text-[12.5px] leading-relaxed text-ink-2">
+                      The same capability built internally — feature by feature — is engineering work you own forever.
+                    </p>
+                    <table className="mt-4 w-full border-collapse text-left">
+                      <thead>
+                        <tr className="border-b border-hairline-strong">
+                          <th scope="col" className="micro-label px-2 py-2">CAPABILITY</th>
+                          <th scope="col" className="micro-label px-2 py-2 text-right">LANDINGSENTINEL</th>
+                          <th scope="col" className="micro-label px-2 py-2 text-right">BUILD INTERNALLY</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          ["Campaign CSV import", "Included", "Build"],
+                          ["Spend aggregation", "Included", "Build"],
+                          ["SSRF-hardened scanner", "Included", "Build / test"],
+                          ["Redirect evidence", "Included", "Build"],
+                          ["Tracking checks", "Included", "Build"],
+                          ["Spend-weighted priority", "Included", "Build"],
+                          ["Client report", "Included", "Build"],
+                          ["White-label settings", "Included", "Build"],
+                          ["Source ownership", "Included", "Your own"],
+                          ["Initial deployment", "Ready", "Engineering work"],
+                        ].map(([cap, ours, theirs]) => (
+                          <tr key={cap} className="border-b border-hairline last:border-b-0">
+                            <td className="px-2 py-1.5 text-[12.5px] text-ink">{cap}</td>
+                            <td className="px-2 py-1.5 text-right text-[12px] font-medium text-healthy">{ours}</td>
+                            <td className="px-2 py-1.5 text-right text-[12px] text-ink-3">{theirs}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Sheet>
+
+                <Sheet label="PRICE" className="h-full">
                   <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-5">
                     <div>
                       <h3 className="font-display text-lg font-bold">Founding agency licence</h3>
-                      <p className="mt-1 text-[13px] text-ink-2">{PRODUCT.priceLine}</p>
+                      <p className="mt-1 text-[13px] text-ink-2">£349 once — no recurring LandingSentinel licence fee.</p>
                     </div>
                     <p className="num font-mono text-4xl font-bold tabular-nums">{PRODUCT.price}</p>
                   </div>
@@ -361,7 +455,7 @@ export function HomeView() {
                       >
                         Buy commercial licence <ArrowRight size={14} aria-hidden="true" />
                       </a>
-                    ) : (
+                    ) : process.env.NODE_ENV === "development" ? (
                       <div>
                         <p className="text-[12.5px] text-ink-2">
                           Checkout is not configured on this deployment. Sellers connect their own payment link via{" "}
@@ -372,6 +466,10 @@ export function HomeView() {
                           Read the licence terms
                         </Button>
                       </div>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => navigate({ view: "license" })}>
+                        Read the licence terms
+                      </Button>
                     )}
                   </div>
                 </Sheet>
@@ -530,7 +628,7 @@ export function HomeView() {
       <footer className="mt-auto border-t border-hairline bg-paper-raised">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <Compass size={16} aria-hidden="true" />
+            <SentinelMark size={16} />
             <MicroLabel>{PRODUCT.name.toUpperCase()} · v{PRODUCT.version}</MicroLabel>
           </div>
           <nav className="flex flex-wrap items-center gap-4" aria-label="Footer">

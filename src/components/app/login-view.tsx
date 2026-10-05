@@ -8,11 +8,13 @@
 
 import { useState } from "react";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
+import { SentinelMark } from "@/components/paper/sentinel-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound } from "lucide-react";
 import { useLogin, type SessionData } from "@/lib/client/queries";
 import { ApiClientError } from "@/lib/client/api";
+import { PRODUCT } from "@/config/product";
 
 export function LoginView({ session, scope }: { session: SessionData; scope: "demo" | "app" }) {
   const login = useLogin(scope);
@@ -24,28 +26,36 @@ export function LoginView({ session, scope }: { session: SessionData; scope: "de
     login.mutate({ password });
   };
 
-  const error =
-    login.error instanceof ApiClientError || login.error instanceof Error
+  const wrongPassword =
+    login.error instanceof ApiClientError && login.error.code === "AUTH_INVALID_CREDENTIALS";
+  const error = wrongPassword
+    ? "The password is incorrect."
+    : login.error instanceof Error && !(login.error instanceof ApiClientError)
       ? login.error.message
-      : null;
+      : login.error instanceof ApiClientError && login.error.code !== "AUTH_INVALID_CREDENTIALS"
+        ? login.error.message
+        : null;
   const locked = login.error instanceof ApiClientError && login.error.code === "AUTH_CONFIG_MISSING";
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-5 py-10">
       <Sheet
-        label="ACCESS CONTROL"
+        label="CONTROL ACCESS"
         title="Administrator sign-in"
         labelAside={<DossierLine items={["REAL CAMPAIGN DATA · PROTECTED"]} />}
       >
+        <div className="flex items-center gap-2.5 border-b border-hairline px-4 py-3.5 sm:px-5">
+          <SentinelMark size={20} />
+          <span className="font-display text-[15px] font-bold leading-none tracking-tight">
+            {PRODUCT.name}
+          </span>
+          <span className="micro-label ml-auto text-ink-3">SINGLE-ADMIN</span>
+        </div>
+
         <form onSubmit={submit} className="flex flex-col gap-4 px-4 py-5 sm:px-5">
-          <div className="flex items-start gap-3">
-            <ShieldCheck size={18} aria-hidden="true" className="mt-0.5 shrink-0 text-ink-2" />
-            <p className="text-[13.5px] leading-relaxed text-ink-2">
-              This deployment protects real campaign data with single-admin authentication. The
-              synthetic demo workspace stays public — sign-in is only required for the workspace
-              that holds your imported campaigns.
-            </p>
-          </div>
+          <p className="text-[13.5px] leading-relaxed text-ink-2">
+            Sign in to access campaign scans and reports.
+          </p>
 
           {locked ? (
             <MarginNote>
@@ -68,6 +78,7 @@ export function LoginView({ session, scope }: { session: SessionData; scope: "de
               className="font-mono"
               placeholder="••••••••••••"
               aria-describedby={error ? "login-error" : undefined}
+              aria-invalid={error ? true : undefined}
             />
           </div>
 
@@ -88,8 +99,9 @@ export function LoginView({ session, scope }: { session: SessionData; scope: "de
       </Sheet>
 
       <MarginNote>
-        Failed attempts are rate-limited. Sessions expire automatically; sign out from the header
-        when finished.
+        The synthetic demo workspace stays public — sign-in is only required for the workspace
+        that holds your imported campaigns. Failed attempts are rate-limited; sessions expire
+        automatically.
       </MarginNote>
     </div>
   );

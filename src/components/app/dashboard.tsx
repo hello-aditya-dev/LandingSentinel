@@ -82,7 +82,7 @@ export function DashboardView({ scope }: { scope: "demo" | "app" }) {
             <FileUp size={14} aria-hidden="true" /> Import campaigns
           </Button>
           <Button size="sm" onClick={runScan} disabled={loading || startScan.isPending} className="gap-2">
-            <Radar size={14} aria-hidden="true" /> {startScan.isPending ? "Starting…" : "Run scan"}
+            <Radar size={14} aria-hidden="true" /> {startScan.isPending ? "Starting scan…" : "Run scan"}
           </Button>
         </div>
       </div>

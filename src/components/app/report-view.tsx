@@ -16,10 +16,14 @@ import { Money, EvidenceBlock, RedirectChain } from "@/components/paper/evidence
 import { stampStatus } from "./dashboard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Printer, ArrowLeft } from "lucide-react";
+import { Printer, ArrowLeft, ArrowRight } from "lucide-react";
+import { useDemoBranding } from "@/store/demo-branding";
 import { cn } from "@/lib/utils";
 
 export function ReportView({ scope, reportId }: { scope: "demo" | "app"; reportId: string }) {
+  // Public-demo playground: browser-local override, never saved to a server.
+  // (The hook is always called; the override only applies to demo scope.)
+  const demoBrandingOverride = useDemoBranding((st) => st.override);
   const { data, isLoading, isError, error } = useReportDetail(scope, reportId);
   const navigate = useRouter((s) => s.navigate);
 
@@ -37,8 +41,12 @@ export function ReportView({ scope, reportId }: { scope: "demo" | "app"; reportI
 
   const { report, scan, moneyMap, findings, campaignsByDestination } = data;
   const branding = report.branding as Record<string, string | null | undefined>;
-  const agency = branding.agencyName || "";
-  const accent = typeof branding.accentColor === "string" && /^#[0-9a-fA-F]{6}$/.test(branding.accentColor) ? branding.accentColor : "#A7372D";
+  const demoOverride = scope === "demo" ? demoBrandingOverride : null;
+  const effective: Record<string, string | null | undefined> = demoOverride
+    ? { ...branding, ...demoOverride }
+    : branding;
+  const agency = effective.agencyName || "";
+  const accent = typeof effective.accentColor === "string" && /^#[0-9a-fA-F]{6}$/.test(effective.accentColor) ? effective.accentColor : "#A7372D";
   const stats = scan.stats;
   const criticals = findings.filter((f) => f.severity === "critical");
   const warnings = findings.filter((f) => f.severity === "warning");
@@ -49,13 +57,42 @@ export function ReportView({ scope, reportId }: { scope: "demo" | "app"; reportI
     <div className="flex flex-col gap-5">
       {/* Controls (screen only) */}
       <div className="no-print flex flex-wrap items-center justify-between gap-3">
-        <Button variant="outline" size="sm" onClick={() => navigate({ view: "reports" })} className="gap-2">
-          <ArrowLeft size={14} aria-hidden="true" /> All reports
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            // From the demo playground, back goes to the demo — not to the
+            // authenticated workspace's reports list.
+            navigate(scope === "demo" ? { view: "demo" } : { view: "reports" })
+          }
+          className="gap-2"
+        >
+          <ArrowLeft size={14} aria-hidden="true" /> {scope === "demo" ? "Back to demo" : "All reports"}
         </Button>
-        <Button size="sm" onClick={() => window.print()} className="gap-2">
-          <Printer size={14} aria-hidden="true" /> Print / Save PDF
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {scope === "demo" ? (
+            <Button variant="outline" size="sm" onClick={() => navigate({ view: "demo", panel: "branding" })} className="gap-2">
+              Rebrand this report
+            </Button>
+          ) : null}
+          <Button size="sm" onClick={() => window.print()} className="gap-2">
+            <Printer size={14} aria-hidden="true" /> Print / Save PDF
+          </Button>
+        </div>
       </div>
+
+      {/* Guided path (public demo): the repaired state is the next beat. */}
+      {scope === "demo" ? (
+        <div className="no-print flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate({ view: "demo", panel: "fixed" })}
+            className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-2 underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-ink"
+          >
+            Next: See the repaired state <ArrowRight size={13} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
       {/* ------------------------- REPORT SHEET ------------------------- */}
       <article
@@ -65,14 +102,25 @@ export function ReportView({ scope, reportId }: { scope: "demo" | "app"; reportI
         {/* Masthead */}
         <header className="border-b-2 border-ink px-6 py-6 sm:px-8" style={{ borderBottomColor: accent }}>
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="flex items-start gap-3">
+              {/* White-label agency logo (branding.logoUrl) when configured */}
+              {typeof effective.logoUrl === "string" && effective.logoUrl ? (
+                 
+                <img
+                  src={effective.logoUrl}
+                  alt=""
+                  className="max-h-10 max-w-[160px] object-contain object-left"
+                />
+              ) : null}
+              <div>
               <p className="font-display text-xl font-bold leading-tight">{agency || "Campaign Preflight"}</p>
-              {branding.reportContactName ? (
+              {effective.reportContactName ? (
                 <p className="mt-0.5 text-[12px] text-ink-2">{branding.reportContactName}</p>
               ) : null}
-              {branding.website ? (
+              {effective.website ? (
                 <p className="url-wrap font-mono text-[11px] text-ink-3">{branding.website}</p>
               ) : null}
+              </div>
             </div>
             <div className="text-right">
               <MicroLabel>CAMPAIGN PREFLIGHT REPORT</MicroLabel>
@@ -258,7 +306,7 @@ export function ReportView({ scope, reportId }: { scope: "demo" | "app"; reportI
             <div>
               <p className="font-display text-[14px] font-semibold">{agency || "Campaign Preflight"}</p>
               <p className="mt-0.5 text-[11.5px] text-ink-3">
-                {branding.reportFooter ?? `Prepared with ${branding.productName ?? "LandingSentinel"}.`}
+                {effective.reportFooter ?? `Prepared with ${effective.productName ?? "LandingSentinel"}.`}
               </p>
               {branding.supportEmail ? (
                 <p className="url-wrap font-mono text-[11px] text-ink-3">{branding.supportEmail}</p>

@@ -183,6 +183,32 @@ egress make this class of attack largely moot.
 - The scanner uses **no third-party API keys** — no scan depends on an
   external scanning service, so there is no key to leak.
 
+## One-page public checker (0.1.2)
+
+`NEXT_PUBLIC_PAGE_CHECK_ENABLED` (default **true**) enables the anonymous
+one-page evaluation route (`POST /api/public/scan`) behind the homepage's
+"Scan one landing page" CTA. Unlike `PUBLIC_SCANNER_ENABLED` (below), this
+route is designed to be public and is constrained accordingly:
+
+- **Exactly one public http(s) URL per evaluation** — no bulk, no CSV, no
+  history, no reports, no workspace involvement.
+- **Every SSRF control applies**: the URL is parsed up front (protocol
+  allowlist, embedded-credential rejection), and the fetch itself resolves
+  DNS and rejects loopback/private/link-local/metadata ranges, re-validating
+  **every redirect hop** — unsafe destinations are never requested.
+- **Scanner limits**: the standard request timeout, redirect cap and body
+  cap; `maxDuration = 30`.
+- **No caller-controlled headers, cookies or credentials are forwarded.**
+- **Rate limiting**: 3 evaluations per IP per hour plus a global per-instance
+  ceiling. In-memory, per instance — the same documented limitation as the
+  login limiter; on serverless, put a platform-level limit in front for
+  hard guarantees.
+- **Ephemeral by design**: the evaluation writes nothing to the database,
+  adds nothing to any workspace, and the evaluated URL is never logged
+  (server logs carry only the outcome code and finding count).
+- Disable entirely with `NEXT_PUBLIC_PAGE_CHECK_ENABLED=false` (hides the
+  CTA and returns an error from the route).
+
 ## Public scanning warning
 
 `PUBLIC_SCANNER_ENABLED` (default **false**) is the only switch that lets the

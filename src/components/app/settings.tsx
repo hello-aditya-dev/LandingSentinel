@@ -105,6 +105,22 @@ function BrandingTab({ scope }: { scope: "demo" | "app" }) {
   };
   const dirty = form !== null;
 
+  // Client-side validation — the server re-validates everything, but the
+  // buyer should never have to submit to find out a value is wrong.
+  const validation = (() => {
+    if (!form) return null;
+    if (!form.productName.trim()) return "Product name cannot be empty — it appears in navigation and reports.";
+    if (!form.agencyName.trim()) return "Agency name cannot be empty — it appears on report mastheads.";
+    if (form.productName.trim().length > 100) return "Product name is longer than 100 characters.";
+    if (form.agencyName.trim().length > 120) return "Agency name is longer than 120 characters.";
+    if (form.logoUrl.trim() && !/^https?:\/\/\S+$/i.test(form.logoUrl.trim()))
+      return "Logo URL must be a full http(s) URL, e.g. https://agency.example/logo.png.";
+    if (!/^#[0-9a-fA-F]{6}$/.test(form.accentColor.trim()))
+      return "Accent colour must be a 6-digit hex value like #A7372D.";
+    if (form.supportEmail.trim().length > 200) return "Support email is longer than 200 characters.";
+    return null;
+  })();
+
   const fields: { key: string; label: string; placeholder: string; hint?: string; mono?: boolean }[] = [
     { key: "productName", label: "Product name", placeholder: "LandingSentinel", hint: "Shown in navigation and reports." },
     { key: "agencyName", label: "Agency name", placeholder: "Meridian Performance Group", hint: "Appears on reports and the app header." },
@@ -117,15 +133,15 @@ function BrandingTab({ scope }: { scope: "demo" | "app" }) {
   ];
 
   const save = async () => {
-    if (!form) return;
+    if (!form || validation) return;
     mutation.mutate(
       {
-        productName: form.productName,
-        agencyName: form.agencyName,
-        logoUrl: form.logoUrl || null,
-        accentColor: /^#[0-9a-fA-F]{6}$/.test(form.accentColor) ? form.accentColor : undefined,
-        supportEmail: form.supportEmail || null,
-        website: form.website || null,
+        productName: form.productName.trim(),
+        agencyName: form.agencyName.trim(),
+        logoUrl: form.logoUrl.trim() || null,
+        accentColor: form.accentColor.trim(),
+        supportEmail: form.supportEmail.trim() || null,
+        website: form.website.trim() || null,
         reportFooter: form.reportFooter || null,
         reportContactName: form.reportContactName || null,
       },
@@ -161,16 +177,27 @@ function BrandingTab({ scope }: { scope: "demo" | "app" }) {
                 className={cn("mt-1.5 h-9 rounded-[2px] border-hairline bg-paper font-[12.5px]", f.mono && "font-mono")}
               />
               {f.hint ? <p className="mt-1 text-[11.5px] text-ink-3">{f.hint}</p> : null}
+              {f.key === "logoUrl" && /^https?:\/\/\S+$/i.test((values.logoUrl ?? "").trim()) ? (
+                <div className="mt-2 flex items-center gap-2 border border-hairline bg-paper px-2 py-1.5">
+                  <img src={(values.logoUrl ?? "").trim()} alt="" className="max-h-8 max-w-[120px] object-contain" />
+                  <span className="micro-label text-ink-3">REPORT PREVIEW</span>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
+        {validation ? (
+          <p role="alert" className="border-t border-hairline px-4 py-2.5 text-[12.5px] leading-relaxed text-critical sm:px-5">
+            {validation}
+          </p>
+        ) : null}
         <div className="flex items-center justify-end gap-2 border-t border-hairline px-4 py-3 sm:px-5">
           {dirty ? (
             <Button size="sm" variant="outline" onClick={() => setForm(null)}>
               Reset
             </Button>
           ) : null}
-          <Button size="sm" onClick={save} disabled={!dirty || mutation.isPending} className="gap-2">
+          <Button size="sm" onClick={save} disabled={!dirty || Boolean(validation) || mutation.isPending} className="gap-2">
             <Check size={14} aria-hidden="true" /> {mutation.isPending ? "Saving…" : "Save branding"}
           </Button>
         </div>

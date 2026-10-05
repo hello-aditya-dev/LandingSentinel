@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LandingSentinel">
+  <!-- Inspection sheet: warm paper, deep ink rule, clipped top-right corner -->
+  <path d="M40 3 H11 Q3 3 3 11 V53 Q3 61 11 61 H53 Q61 61 61 53 V24 L40 3 Z"
+        fill="#faf8f2" stroke="#181714" stroke-width="4"/>
+  <!-- Folded corner (dog-ear) -->
+  <path d="M40 3 V18 Q40 24 46 24 H61 Z"
+        fill="#ece7db" stroke="#181714" stroke-width="4" stroke-linejoin="round"/>
+  <!-- Inspection-registration cross -->
+  <path d="M30 28 V52 M18 40 H42"
+        stroke="#181714" stroke-width="6" stroke-linecap="square" fill="none"/>
+  <!-- Sentinel marker: muted critical red -->
+  <rect x="25" y="35" width="10" height="10" fill="#a7372d"/>
+</svg>

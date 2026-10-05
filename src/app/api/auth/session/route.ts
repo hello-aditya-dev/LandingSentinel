@@ -15,7 +15,8 @@ export const GET = route(async (req) => {
   const scope = url.searchParams.get("scope") === "demo" ? "demo" : "app";
   const ctx = await resolveContext(scope);
 
-  const authRequired = ctx.workspaceSlug !== "demo" && authModeActive();
+  const authRequired =
+    ctx.workspaceSlug !== "demo" && ctx.workspaceSlug !== "demo-session" && authModeActive();
   const authenticated = authRequired ? Boolean(await validateAdminSession(req)) : true;
 
   return ok({

@@ -12,6 +12,7 @@
  */
 
 import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import { DEMO_DESTINATIONS, DEMO_CLIENT_NAME } from "@/lib/scanner/demo-fixtures";
 import { runScanTargets } from "@/lib/scanner/runner";
 import type { WorkspaceContext } from "@/lib/services/context";
@@ -32,20 +33,9 @@ export async function seedDemoWorkspace(): Promise<void> {
   const workspace = await db.workspace.create({
     data: { slug: "demo", name: "Demo Workspace (Synthetic)" },
   });
-  const client = await db.client.create({
-    data: { workspaceId: workspace.id, name: DEMO_CLIENT_NAME },
-  });
-  await db.branding.create({
-    data: {
-      workspaceId: workspace.id,
-      productName: "LandingSentinel",
-      agencyName: "Meridian Performance Group",
-      accentColor: "#A7372D",
-      supportEmail: "preflight@meridianpg.test",
-      website: "https://meridianpg.test",
-      reportFooter: "Prepared by Meridian Performance Group · Synthetic demo data",
-      reportContactName: "A. Sharma, Performance Lead",
-    },
+  const clientId = await seedDemoDataset(workspace.id);
+  const mixedBatch = await db.importBatch.findFirstOrThrow({
+    where: { workspaceId: workspace.id, filename: "paid-media-mixed-sample.csv" },
   });
 
   const ctx: WorkspaceContext = {
@@ -54,85 +44,6 @@ export async function seedDemoWorkspace(): Promise<void> {
     workspaceSlug: "demo",
     scanEngine: "demo-fixture",
   };
-
-  // 2. Import batches (mirrors sample-data/*.csv).
-  const batchNames = [
-    "google-ads-sample.csv",
-    "meta-ads-sample.csv",
-    "paid-media-mixed-sample.csv",
-  ] as const;
-  const batches = new Map<string, string>();
-  for (const filename of batchNames) {
-    const rows = DEMO_DESTINATIONS.flatMap((d) => d.rows.filter((r) => r.batch === filename));
-    const batch = await db.importBatch.create({
-      data: {
-        workspaceId: workspace.id,
-        clientId: client.id,
-        filename,
-        platform:
-          filename === "meta-ads-sample.csv"
-            ? "Meta"
-            : filename === "google-ads-sample.csv"
-              ? "Google Ads"
-              : "Mixed",
-        currency: "GBP",
-        originalRowCount: rows.length,
-        validRowCount: rows.length,
-        rejectedRowCount: 0,
-        demo: true,
-        createdAt: new Date(Date.now() - 15 * DAY),
-      },
-    });
-    batches.set(filename, batch.id);
-  }
-
-  // 3. Campaign rows, destinations, links.
-  let rowIndex = 0;
-  for (const dest of DEMO_DESTINATIONS) {
-    const destination = await db.destination.create({
-      data: {
-        workspaceId: workspace.id,
-        normalizedKey: dest.normalizedKey,
-        representativeUrl: dest.representativeUrl,
-        hostname: dest.hostname,
-        pathname: dest.pathname,
-        createdAt: new Date(Date.now() - 15 * DAY),
-      },
-    });
-
-    for (const row of dest.rows) {
-      const campaignRow = await db.campaignRow.create({
-        data: {
-          importBatchId: batches.get(row.batch)!,
-          platform: row.platform === "meta" ? "Meta" : row.platform === "google" ? "Google Ads" : row.platform === "tiktok" ? "TikTok" : "LinkedIn",
-          campaignName: row.campaignName,
-          adGroupName: row.adGroupName ?? null,
-          adName: null,
-          originalUrl: row.originalUrl,
-          spendMinor: row.spendMinor,
-          currency: "GBP",
-          rawRow: {
-            platform: row.platform,
-            campaign: row.campaignName,
-            adGroup: row.adGroupName ?? "",
-            finalUrl: row.originalUrl,
-            spend: (row.spendMinor / 100).toFixed(2),
-            currency: "GBP",
-          },
-          createdAt: new Date(Date.now() - 15 * DAY),
-        },
-      });
-      await db.destinationCampaign.create({
-        data: {
-          campaignRowId: campaignRow.id,
-          destinationId: destination.id,
-          spendMinor: row.spendMinor,
-        },
-      });
-      rowIndex += 1;
-    }
-  }
-  console.log(`✓ Imported ${rowIndex} synthetic campaign rows across ${DEMO_DESTINATIONS.length} destinations`);
 
   // 4. Three historical live scans + one "after fixes" scan.
   const scanPlan: { label: string; variant: "live" | "fixed"; scanIndex: number; startedAt: Date }[] = [
@@ -160,8 +71,8 @@ export async function seedDemoWorkspace(): Promise<void> {
     const scan = await db.scan.create({
       data: {
         workspaceId: workspace.id,
-        clientId: client.id,
-        importBatchId: batches.get("paid-media-mixed-sample.csv")!,
+        clientId,
+        importBatchId: mixedBatch.id,
         label: plan.label,
         state: "running",
         engine: "demo-fixture",
@@ -260,3 +171,144 @@ export async function seedDemoWorkspace(): Promise<void> {
 }
 
 
+
+/* ---------------------------------------------------------------- */
+/* Shared dataset seeding (batches, campaign rows, destinations)     */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Seeds the synthetic Northstar Outfitters import dataset (3 batches,
+ * 32 campaign rows, 22 destinations, links) into an existing workspace.
+ * Used by both the CLI demo seed (which then adds scan history) and the
+ * per-session demo workspaces (which start unscanned, ready for the
+ * prospect's first preflight).
+ *
+ * Returns the created client's id.
+ */
+export async function seedDemoDataset(
+  workspaceId: string,
+  client: Prisma.TransactionClient = db
+): Promise<string> {
+  const clientRow = await client.client.create({
+    data: { workspaceId, name: DEMO_CLIENT_NAME },
+  });
+  await client.branding.create({
+    data: {
+      workspaceId,
+      productName: "LandingSentinel",
+      agencyName: "Meridian Performance Group",
+      accentColor: "#A7372D",
+      supportEmail: "preflight@meridianpg.test",
+      website: "https://meridianpg.test",
+      reportFooter: "Prepared by Meridian Performance Group · Synthetic demo data",
+      reportContactName: "A. Sharma, Performance Lead",
+    },
+  });
+
+  // Import batches (mirrors sample-data/*.csv).
+  const batchNames = [
+    "google-ads-sample.csv",
+    "meta-ads-sample.csv",
+    "paid-media-mixed-sample.csv",
+  ] as const;
+  const batches = new Map<string, string>();
+  for (const filename of batchNames) {
+    const rows = DEMO_DESTINATIONS.flatMap((d) => d.rows.filter((r) => r.batch === filename));
+    const batch = await client.importBatch.create({
+      data: {
+        workspaceId,
+        clientId: clientRow.id,
+        filename,
+        platform:
+          filename === "meta-ads-sample.csv"
+            ? "Meta"
+            : filename === "google-ads-sample.csv"
+              ? "Google Ads"
+              : "Mixed",
+        currency: "GBP",
+        originalRowCount: rows.length,
+        validRowCount: rows.length,
+        rejectedRowCount: 0,
+        demo: true,
+        createdAt: new Date(Date.now() - 15 * DAY),
+      },
+    });
+    batches.set(filename, batch.id);
+  }
+
+  // Destinations, campaign rows and links — batched for speed.
+  const destinations = await client.destination.createMany({
+    data: DEMO_DESTINATIONS.map((dest) => ({
+      workspaceId,
+      normalizedKey: dest.normalizedKey,
+      representativeUrl: dest.representativeUrl,
+      hostname: dest.hostname,
+      pathname: dest.pathname,
+      createdAt: new Date(Date.now() - 15 * DAY),
+    })),
+  });
+
+  // createMany does not return ids — fetch them keyed by normalizedKey.
+  const created = await client.destination.findMany({
+    where: { workspaceId },
+    select: { id: true, normalizedKey: true },
+  });
+  const destinationIds = new Map(created.map((d) => [d.normalizedKey, d.id]));
+
+  const campaignRows = DEMO_DESTINATIONS.flatMap((dest) =>
+    dest.rows.map((row) => ({
+      importBatchId: batches.get(row.batch)!,
+      platform: row.platform === "meta" ? "Meta" : row.platform === "google" ? "Google Ads" : row.platform === "tiktok" ? "TikTok" : "LinkedIn",
+      campaignName: row.campaignName,
+      adGroupName: row.adGroupName ?? null,
+      adName: null,
+      originalUrl: row.originalUrl,
+      spendMinor: row.spendMinor,
+      currency: "GBP",
+      rawRow: {
+        platform: row.platform,
+        campaign: row.campaignName,
+        adGroup: row.adGroupName ?? "",
+        finalUrl: row.originalUrl,
+        spend: (row.spendMinor / 100).toFixed(2),
+        currency: "GBP",
+      },
+      createdAt: new Date(Date.now() - 15 * DAY),
+    }))
+  );
+  await client.campaignRow.createMany({ data: campaignRows });
+
+  // Link every inserted row to its destination. The workspace is fresh, so
+  // the rows just inserted are exactly these; each row's own spendMinor is
+  // the link spend (deterministic even when URLs repeat within a destination).
+  const inserted = await client.campaignRow.findMany({
+    where: { importBatchId: { in: [...batches.values()] } },
+    select: { id: true, originalUrl: true, spendMinor: true },
+  });
+  const urlToDest = new Map<string, string>();
+  for (const dest of DEMO_DESTINATIONS) {
+    for (const row of dest.rows) {
+      urlToDest.set(row.originalUrl, destinationIds.get(dest.normalizedKey)!);
+    }
+  }
+  await client.destinationCampaign.createMany({
+    data: inserted.flatMap((r) => {
+      const destinationId = urlToDest.get(r.originalUrl);
+      return destinationId ? [{ campaignRowId: r.id, destinationId, spendMinor: r.spendMinor }] : [];
+    }),
+  });
+
+  return clientRow.id;
+}
+
+/**
+ * Seeds a fresh per-session demo workspace: the import dataset only —
+ * no scans, no findings, no report. The prospect runs their own first
+ * preflight from the RUN PREFLIGHT action.
+ */
+export async function seedDemoSessionWorkspace(
+  workspaceId: string,
+  client: Prisma.TransactionClient = db
+): Promise<void> {
+  await seedDemoDataset(workspaceId, client);
+}

@@ -162,7 +162,9 @@ export async function requireAdminFor(
   ctx: WorkspaceContext,
   req: Request
 ): Promise<ReturnType<typeof fail> | null> {
-  if (ctx.workspaceSlug === "demo" || !authModeActive()) return null;
+  // The public synthetic demo workspaces (shared or per-session) stay
+  // public — sign-in protects only real campaign data.
+  if (ctx.workspaceSlug === "demo" || ctx.workspaceSlug === "demo-session" || !authModeActive()) return null;
   const session = await validateAdminSession(req);
   if (session) return null;
   return fail(

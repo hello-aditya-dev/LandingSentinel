@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useRouter, type Route } from "@/store/router";
 import { PRODUCT } from "@/config/product";
 import { MicroLabel } from "@/components/paper/paper";
+import { SentinelMark } from "@/components/paper/sentinel-mark";
 import {
   LayoutDashboard,
   FileUp,
@@ -16,7 +17,6 @@ import {
   FileText,
   Users,
   Settings,
-  Compass,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -64,7 +64,7 @@ export function AppShell({
             className="flex items-center gap-2.5 text-left"
             aria-label="Back to LandingSentinel home"
           >
-            <Compass size={20} strokeWidth={2} aria-hidden="true" className="text-ink" />
+            <SentinelMark size={22} />
             <span className="font-display text-[17px] font-bold leading-none tracking-tight">{productName}</span>
           </button>
 
@@ -132,12 +132,20 @@ export function AppShell({
 }
 
 export function DemoBar() {
+  const navigate = useRouter((s) => s.navigate);
   return (
     <div
       role="status"
-      className="flex items-center justify-center gap-2 border-t border-warning/30 bg-warning-wash px-4 py-1.5"
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-0.5 border-t border-warning/30 bg-warning-wash px-4 py-1.5"
     >
       <span className="micro-label !text-[10px] font-semibold !text-warning">DEMO MODE · SYNTHETIC CAMPAIGN DATA</span>
+      <button
+        type="button"
+        onClick={() => navigate({ view: "demo" })}
+        className="micro-label !text-[10px] underline decoration-hairline-strong underline-offset-2 transition-colors hover:!text-warning"
+      >
+        DEMO CONTROLS
+      </button>
     </div>
   );
 }

@@ -190,8 +190,10 @@ export function useLogout(scope: "demo" | "app") {
   return useMutation({
     mutationFn: () => api<{ authenticated: boolean }>("/api/auth/logout", { method: "POST" }),
     onSuccess: () => {
+      // Remove — not merely invalidate — protected workspace queries so no
+      // protected data survives sign-out in the client cache.
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "session" });
       queryClient.invalidateQueries({ queryKey: ["session", scope] });
-      queryClient.invalidateQueries();
     },
   });
 }

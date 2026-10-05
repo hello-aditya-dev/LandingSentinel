@@ -12,17 +12,18 @@ import { create } from "zustand";
 
 export type Route =
   | { view: "home" }
-  | { view: "demo" }
+  | { view: "demo"; panel?: "fixed" | "branding" }
+  | { view: "scanOne" }
   | { view: "docs" }
   | { view: "license" }
   | { view: "privacy" }
   | { view: "dashboard" }
-  | { view: "import" }
+  | { view: "import"; scope?: "demo" }
   | { view: "scans" }
-  | { view: "scan"; scanId: string }
-  | { view: "finding"; findingId: string }
+  | { view: "scan"; scanId: string; scope?: "demo" }
+  | { view: "finding"; findingId: string; scope?: "demo" }
   | { view: "reports" }
-  | { view: "report"; reportId: string }
+  | { view: "report"; reportId: string; scope?: "demo" }
   | { view: "clients" }
   | { view: "settings"; tab: "overview" | "branding" | "scanning" | "system" };
 
@@ -33,8 +34,25 @@ export function parseHash(rawHash: string): Route {
   if (parts.length === 0) return { view: "home" };
 
   switch (parts[0]) {
-    case "demo":
+    case "demo": {
+      // Demo-scoped deep links: #/demo/scans/:id, #/demo/findings/:id,
+      // #/demo/reports/:id keep the synthetic workspace through navigation —
+      // findings and reports opened from the live demo never hit the real
+      // workspace's authentication wall.
+      const section = parts[1];
+      const id = parts[2];
+      if (section === "scans" && id) return { view: "scan", scanId: id, scope: "demo" };
+      if (section === "findings" && id) return { view: "finding", findingId: id, scope: "demo" };
+      if (section === "reports" && id) return { view: "report", reportId: id, scope: "demo" };
+      if (section === "fixed") return { view: "demo", panel: "fixed" };
+      if (section === "branding") return { view: "demo", panel: "branding" };
+      if (section === "import") return { view: "import", scope: "demo" };
       return { view: "demo" };
+    }
+    case "scan":
+    case "scan-one":
+    case "checker":
+      return { view: "scanOne" };
     case "docs":
       return { view: "docs" };
     case "license":
@@ -78,7 +96,9 @@ export function routeToHash(route: Route): string {
     case "home":
       return "#/";
     case "demo":
-      return "#/demo";
+      return route.panel === "fixed" ? "#/demo/fixed" : route.panel === "branding" ? "#/demo/branding" : "#/demo";
+    case "scanOne":
+      return "#/scan";
     case "docs":
       return "#/docs";
     case "license":
@@ -88,17 +108,17 @@ export function routeToHash(route: Route): string {
     case "dashboard":
       return "#/app";
     case "import":
-      return "#/app/import";
+      return route.scope === "demo" ? "#/demo/import" : "#/app/import";
     case "scans":
       return "#/app/scans";
     case "scan":
-      return `#/app/scans/${route.scanId}`;
+      return route.scope === "demo" ? `#/demo/scans/${route.scanId}` : `#/app/scans/${route.scanId}`;
     case "finding":
-      return `#/app/findings/${route.findingId}`;
+      return route.scope === "demo" ? `#/demo/findings/${route.findingId}` : `#/app/findings/${route.findingId}`;
     case "reports":
       return "#/app/reports";
     case "report":
-      return `#/app/reports/${route.reportId}`;
+      return route.scope === "demo" ? `#/demo/reports/${route.reportId}` : `#/app/reports/${route.reportId}`;
     case "clients":
       return "#/app/clients";
     case "settings":
@@ -128,7 +148,16 @@ export const useRouter = create<RouterState>((set) => ({
   },
 }));
 
-/** Returns the scope used by app views: the demo route uses demo scope. */
+/** Returns the scope used by app views: the demo route and demo-scoped
+ * deep links (opened from the live demo) use the demo workspace. */
 export function scopeForRoute(route: Route): "demo" | "app" {
-  return route.view === "demo" ? "demo" : "app";
+  if (route.view === "demo") return "demo";
+  if (route.view === "import" && route.scope === "demo") return "demo";
+  if (
+    (route.view === "scan" || route.view === "finding" || route.view === "report") &&
+    route.scope === "demo"
+  ) {
+    return "demo";
+  }
+  return "app";
 }

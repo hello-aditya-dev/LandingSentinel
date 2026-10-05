@@ -96,6 +96,7 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
   const stats = scan.stats;
   const completedCount = targets.filter((t) => t.state === "complete" || t.state === "failed").length;
   const current = targets.find((t) => t.state === "running");
+  const failedTargets = targets.filter((t) => t.state === "failed");
 
   const totalSpend = moneyMap.reduce((s, r) => s + r.associatedSpendMinor, 0);
   const criticalSpend = stats?.criticalSpendMinor ?? 0;
@@ -133,12 +134,19 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
               size="sm"
               variant="outline"
               onClick={() => {
+                // An existing report is viewed, never regenerated — each
+                // click creates exactly one report or opens the one that
+                // already exists.
+                if (data.latestReportId) {
+                  navigate(scope === "demo" ? { view: "report", reportId: data.latestReportId, scope: "demo" } : { view: "report", reportId: data.latestReportId });
+                  return;
+                }
                 generateReport.mutate(
                   { scanId: scan.id },
                   {
                     onSuccess: ({ reportId }) => {
                       toast({ title: "Report ready", description: "The branded client report has been generated." });
-                      navigate({ view: "report", reportId });
+                      navigate(scope === "demo" ? { view: "report", reportId, scope: "demo" } : { view: "report", reportId });
                     },
                     onError: (err) =>
                       toast({ title: "The report could not be generated", description: err instanceof Error ? err.message : undefined }),
@@ -148,11 +156,54 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
               disabled={running || generateReport.isPending}
               className="gap-2"
             >
-              <FileText size={14} aria-hidden="true" /> {data.latestReportId ? "View report" : "Generate report"}
+              <FileText size={14} aria-hidden="true" />{" "}
+              {generateReport.isPending
+                ? "Generating report…"
+                : data.latestReportId
+                  ? "View report"
+                  : "Generate report"}
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Partial-scan summary — a partial scan is not a failure */}
+      {!running && scan.state === "partial" ? (
+        <Sheet
+          label="SCAN / PARTIAL"
+          title={`${targets.filter((t) => t.state === "complete").length} destinations completed · ${targets.filter((t) => t.state === "failed").length} did not finish`}
+        >
+          <div className="flex flex-col gap-4 px-4 py-4 sm:px-5">
+            <p className="text-[13.5px] leading-relaxed text-ink-2">
+              Every destination that completed was inspected and its findings are shown below —
+              partial results are never discarded. The destinations listed here did not complete
+              within the scan window.
+            </p>
+            <ul className="divide-y divide-hairline border border-hairline bg-paper-raised">
+              {targets
+                .filter((t) => t.state === "failed")
+                .map((t) => (
+                  <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-2">
+                    <span className="url-wrap min-w-0 flex-1 font-mono text-[12px] text-ink">{t.normalizedKey}</span>
+                    <span className="font-mono text-[11px] text-critical">
+                      {t.error?.code ?? "SCAN_FAILED"}
+                    </span>
+                  </li>
+                ))}
+            </ul>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-3">
+              <p className="max-w-md text-[12px] leading-relaxed text-ink-3">
+                {failedTargets.some((t) => t.error?.code === "SCAN_WINDOW_EXCEEDED")
+                  ? "The scan window closed before these destinations were reached. Raise SCAN_MAX_DURATION_MS together with your host's function timeout, or lower SCAN_MAX_TARGETS."
+                  : "Common causes: a destination that timed out, an unreachable host, or a server that blocked the scanner."}
+              </p>
+              <Button size="sm" variant="outline" onClick={() => navigate({ view: "scans" })} className="gap-2 print:hidden">
+                <Radar size={14} aria-hidden="true" /> Start another scan
+              </Button>
+            </div>
+          </div>
+        </Sheet>
+      ) : null}
 
       {/* Progress panel while running */}
       {running ? (
@@ -164,7 +215,18 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
           targets={targets}
         />
       ) : (
-        <MetricsRow scan={scan} />
+        <>
+          <MetricsRow scan={scan} />
+          {/* Zero-issue experience — a clean scan is a result, not an absence */}
+          {(stats?.criticalFindings ?? 0) === 0 && (stats?.warningFindings ?? 0) === 0 ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-healthy/40 bg-healthy-wash px-4 py-3">
+              <MicroLabel className="!text-healthy">0 CRITICAL · 0 WARNINGS</MicroLabel>
+              <p className="text-[13px] text-ink-2">
+                All inspected destinations passed the current preflight rules.
+              </p>
+            </div>
+          ) : null}
+        </>
       )}
 
       {/* Spend exposure bar */}
@@ -195,10 +257,10 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
         </Sheet>
       ) : null}
 
-      {/* Money Map */}
+      {/* Money Map — in the public demo it leads with plain language */}
       <Sheet
-        label="MONEY MAP"
-        title="Destinations ranked by severity and associated spend"
+        label={scope === "demo" ? "FIX THESE FIRST" : "MONEY MAP"}
+        title={scope === "demo" ? "The findings that deserve attention first" : "Destinations ranked by severity and associated spend"}
         labelAside={
           <div className="flex flex-wrap items-center gap-2 print:hidden">
             <button
@@ -219,6 +281,15 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
           </div>
         }
       >
+        {scope === "demo" ? (
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-hairline px-4 py-2.5 sm:px-5">
+            <MicroLabel>MONEY MAP</MicroLabel>
+            <p className="text-[12px] text-ink-2">
+              Findings ranked using the campaign spend associated with each destination.
+            </p>
+          </div>
+        ) : null}
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-hairline px-4 py-2.5 sm:px-5 print:hidden">
           <div className="flex items-center gap-1" role="group" aria-label="Filter by status">
@@ -239,9 +310,21 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex items-center gap-2 px-4 py-6 text-[13px] text-ink-3 sm:px-5">
-            <Search size={14} aria-hidden="true" />
-            No destinations match these filters.
+          <div className="flex items-start gap-2 px-4 py-6 text-[13px] text-ink-2 sm:px-5">
+            <Search size={14} aria-hidden="true" className="mt-0.5 shrink-0 text-ink-3" />
+            {statusFilter === "critical" ? (
+              <span>
+                <strong className="font-semibold text-ink">No critical destinations.</strong>{" "}
+                This scan did not produce a confirmed critical finding.
+              </span>
+            ) : statusFilter === "warning" ? (
+              <span>
+                <strong className="font-semibold text-ink">No warning destinations.</strong>{" "}
+                This scan did not produce a warning-level finding.
+              </span>
+            ) : (
+              "No destinations match these filters."
+            )}
           </div>
         ) : (
           <>
@@ -266,6 +349,7 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
                       key={row.scanTargetId}
                       row={row}
                       campaigns={campaignsByDestination[row.destinationId] ?? []}
+                      scope={scope}
                     />
                   ))}
                 </tbody>
@@ -279,6 +363,7 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
                   key={row.scanTargetId}
                   row={row}
                   campaigns={campaignsByDestination[row.destinationId] ?? []}
+                  scope={scope}
                 />
               ))}
             </div>
@@ -372,7 +457,7 @@ function PrimaryFindingCell({ row }: { row: MoneyMapRow }) {
   );
 }
 
-function MoneyMapRowDesktop({ row, campaigns }: { row: MoneyMapRow; campaigns: { platform: string | null; campaignName: string | null; spendMinor: number; currency: string }[] }) {
+function MoneyMapRowDesktop({ row, campaigns, scope }: { row: MoneyMapRow; campaigns: { platform: string | null; campaignName: string | null; spendMinor: number; currency: string }[]; scope: "demo" | "app" }) {
   const navigate = useRouter((s) => s.navigate);
   return (
     <tr
@@ -413,9 +498,15 @@ function MoneyMapRowDesktop({ row, campaigns }: { row: MoneyMapRow; campaigns: {
             size="sm"
             variant="outline"
             className="h-7 gap-1.5 px-2 text-[11.5px]"
-            onClick={() => navigate({ view: "finding", findingId: row.primaryFinding!.id })}
+            onClick={() =>
+              navigate(
+                scope === "demo"
+                  ? { view: "finding", findingId: row.primaryFinding!.id, scope: "demo" }
+                  : { view: "finding", findingId: row.primaryFinding!.id }
+              )
+            }
           >
-            <FileSearch size={12} aria-hidden="true" /> Open
+            <FileSearch size={12} aria-hidden="true" /> {scope === "demo" ? "View evidence" : "Open"}
           </Button>
         ) : (
           <span className="micro-label">CLEAN</span>
@@ -425,7 +516,7 @@ function MoneyMapRowDesktop({ row, campaigns }: { row: MoneyMapRow; campaigns: {
   );
 }
 
-function MoneyMapRowMobile({ row, campaigns }: { row: MoneyMapRow; campaigns: { platform: string | null; campaignName: string | null; spendMinor: number; currency: string }[] }) {
+function MoneyMapRowMobile({ row, campaigns, scope }: { row: MoneyMapRow; campaigns: { platform: string | null; campaignName: string | null; spendMinor: number; currency: string }[]; scope: "demo" | "app" }) {
   const navigate = useRouter((s) => s.navigate);
   return (
     <div className={cn("border-b border-hairline px-4 py-3", row.status === "critical" && "bg-critical-wash/40", row.status === "warning" && "bg-warning-wash/30")}>
@@ -449,9 +540,15 @@ function MoneyMapRowMobile({ row, campaigns }: { row: MoneyMapRow; campaigns: { 
             size="sm"
             variant="outline"
             className="h-7 shrink-0 gap-1 px-2 text-[11.5px]"
-            onClick={() => navigate({ view: "finding", findingId: row.primaryFinding!.id })}
+            onClick={() =>
+              navigate(
+                scope === "demo"
+                  ? { view: "finding", findingId: row.primaryFinding!.id, scope: "demo" }
+                  : { view: "finding", findingId: row.primaryFinding!.id }
+              )
+            }
           >
-            <FileSearch size={12} aria-hidden="true" /> Open
+            <FileSearch size={12} aria-hidden="true" /> {scope === "demo" ? "View evidence" : "Open"}
           </Button>
         ) : null}
       </div>

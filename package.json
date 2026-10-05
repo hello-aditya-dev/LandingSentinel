@@ -1,6 +1,6 @@
 {
   "name": "landingsentinel",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
@@ -105,5 +105,5 @@
     "typescript": "^5",
     "vitest": "^5.0.3"
   },
-  "description": "LandingSentinel — white-label paid-media landing-page preflight and integrity platform"
+  "description": "LandingSentinel \u2014 white-label paid-media landing-page preflight and integrity platform"
 }

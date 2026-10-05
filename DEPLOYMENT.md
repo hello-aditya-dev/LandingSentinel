@@ -144,6 +144,10 @@ LandingSentinel can be deployed to Vercel. Points that matter:
     Vercel alternative to disabling auth is platform-level protection
     (Vercel Authentication / SSO or Cloudflare Access in front).
   - Optional `SCAN_*` limits — see CONFIGURATION.md.
+  - `NEXT_PUBLIC_SITE_URL` — optional; the canonical public URL used for
+    social-preview metadata (Open Graph / Twitter card image URLs, the
+    canonical link and the sitemap). On Vercel the deployment URL is picked
+    up automatically when unset; set it when you attach a custom domain.
   - `NEXT_PUBLIC_*` branding values are inlined at build time, so changing
     them requires a redeploy.
 - **Node runtime.** All API routes — including the scanner routes — already

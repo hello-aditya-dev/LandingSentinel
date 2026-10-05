@@ -249,16 +249,19 @@ async function scanOneTarget(
     if (demoDestination) {
       if (fixtureDelays) {
         // Staged progress so the demo scan is observable, like a real scan.
+        // Tuned so the 22-destination synthetic preflight completes in
+        // roughly 8–12 seconds — long enough to feel real, short enough to
+        // hold a prospect's attention (public demo target).
         await setStage(target.id, "dns");
-        await sleep(220 + (demoDestination.pathname.length * 37) % 180);
+        await sleep(340 + (demoDestination.pathname.length * 37) % 260);
         await setStage(target.id, "request");
-        await sleep(240 + (demoDestination.hostname.length * 53) % 260);
+        await sleep(370 + (demoDestination.hostname.length * 53) % 400);
         if ((demoDestination.live.redirects ?? demoDestination.fixed.redirects ?? []).length > 0 && variant === "live") {
           await setStage(target.id, "redirects");
-          await sleep(200);
+          await sleep(270);
         }
         await setStage(target.id, "inspect");
-        await sleep(180 + (demoDestination.normalizedKey.length * 31) % 200);
+        await sleep(260 + (demoDestination.normalizedKey.length * 31) % 300);
       }
       result = fixtureFetch(demoDestination, variant, scanIndex);
     } else {

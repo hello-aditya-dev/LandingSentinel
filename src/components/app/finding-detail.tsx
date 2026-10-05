@@ -9,7 +9,7 @@
  * Raw evidence is always one click away; interpretation never replaces it.
  */
 
-import { useFindingDetail } from "@/lib/client/queries";
+import { useFindingDetail, useDashboard, useGenerateReport } from "@/lib/client/queries";
 import { useRouter } from "@/store/router";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { SeverityBadge } from "@/components/paper/stamp";
@@ -17,7 +17,7 @@ import { Money, EvidenceBlock, RedirectChain, CopyButton } from "@/components/pa
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CampaignsPanel } from "./scan-detail";
-import { ArrowLeft, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, ClipboardCheck } from "lucide-react";
 
 const TRACKER_LABELS: Record<string, string> = {
   ga4: "Google Analytics (GA4)",
@@ -61,7 +61,9 @@ export function FindingDetailView({ scope, findingId }: { scope: "demo" | "app";
       <div>
         <button
           type="button"
-          onClick={() => navigate({ view: "scan", scanId: finding.scanId })}
+          onClick={() =>
+            navigate(scope === "demo" ? { view: "scan", scanId: finding.scanId, scope: "demo" } : { view: "scan", scanId: finding.scanId })
+          }
           className="micro-label transition-colors hover:text-ink"
         >
           ← BACK TO MONEY MAP
@@ -218,7 +220,9 @@ export function FindingDetailView({ scope, findingId }: { scope: "demo" | "app";
               <li key={f.id} className="ledger-row">
                 <button
                   type="button"
-                  onClick={() => navigate({ view: "finding", findingId: f.id })}
+                  onClick={() =>
+                    navigate(scope === "demo" ? { view: "finding", findingId: f.id, scope: "demo" } : { view: "finding", findingId: f.id })
+                  }
                   className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left sm:px-5"
                 >
                   <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{f.title}</span>
@@ -231,10 +235,53 @@ export function FindingDetailView({ scope, findingId }: { scope: "demo" | "app";
       ) : null}
 
       <div className="print:hidden">
-        <Button variant="outline" size="sm" onClick={() => navigate({ view: "scan", scanId: finding.scanId })} className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            navigate(scope === "demo" ? { view: "scan", scanId: finding.scanId, scope: "demo" } : { view: "scan", scanId: finding.scanId })
+          }
+          className="gap-2"
+        >
           <ArrowLeft size={14} aria-hidden="true" /> Back to Money Map
         </Button>
       </div>
+      <DemoNextStep scope={scope} scanId={finding.scanId} />
+    </div>
+  );
+}
+
+/** Guided path (public demo): the natural next beat after the first finding. */
+function DemoNextStep({ scope, scanId }: { scope: "demo" | "app"; scanId: string }) {
+  const navigate = useRouter((s) => s.navigate);
+  const { data: dashboard } = useDashboard(scope);
+  const generateReport = useGenerateReport(scope);
+
+  if (scope !== "demo") return null;
+
+  const go = () => {
+    if (dashboard?.latestReportId) {
+      navigate({ view: "report", reportId: dashboard.latestReportId, scope: "demo" });
+      return;
+    }
+    generateReport.mutate(
+      { scanId },
+      {
+        onSuccess: ({ reportId }) => navigate({ view: "report", reportId, scope: "demo" }),
+      }
+    );
+  };
+
+  return (
+    <div className="print:hidden flex justify-end">
+      <button
+        type="button"
+        onClick={go}
+        disabled={generateReport.isPending}
+        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-2 underline decoration-hairline-strong underline-offset-4 transition-colors hover:text-ink disabled:opacity-50"
+      >
+        {generateReport.isPending ? "Preparing report…" : "Next: See the campaign report"} <ArrowRight size={13} aria-hidden="true" />
+      </button>
     </div>
   );
 }

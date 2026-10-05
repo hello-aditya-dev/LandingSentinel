@@ -1,34 +1,89 @@
 /**
  * Workspace context resolution + white-label branding.
  *
- * Two workspaces exist:
- * - "demo"    — the seeded synthetic sales demo (Northstar Outfitters).
- * - "primary" — the buyer's real workspace.
+ * Workspaces:
+ * - "demo"           — the shared synthetic demo workspace (used only by
+ *                      DEMO_MODE app scope, i.e. a single-operator local demo).
+ * - "demo:s:{sid}"   — per-session demo workspaces for the PUBLIC demo
+ *                      scope: every browser session gets its own synthetic
+ *                      workspace seeded with the import dataset, so one
+ *                      anonymous visitor can never affect another. Stale
+ *                      session workspaces are cleaned up opportunistically.
+ * - "primary"        — the buyer's real workspace.
  *
  * Scope rules:
- * - Requests with scope=demo always use the demo workspace and the fixture
- *   scanner (never real URL fetching).
- * - Requests with scope=app use DEMO_MODE to decide: demo workspace with
- *   fixtures, or the primary workspace with the real scanner.
+ * - Requests with scope=demo always use the caller's session demo workspace
+ *   and the fixture scanner (never real URL fetching).
+ * - Requests with scope=app use DEMO_MODE to decide: the shared demo
+ *   workspace with fixtures, or the primary workspace with the real scanner.
  *
  * Branding precedence (documented in BRANDING.md):
  *   database branding fields (when non-empty) → NEXT_PUBLIC_* env → defaults.
  */
 
+import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { PRODUCT } from "@/config/product";
+import { seedDemoSessionWorkspace } from "@/lib/services/demo-seed";
+import { DEMO_SESSION_COOKIE, isValidDemoSessionId } from "@/lib/demo-session";
 
 export type Scope = "demo" | "app";
+const DEMO_SESSION_PREFIX = "demo:s:";
+const DEMO_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export type WorkspaceContext = {
   scope: Scope;
   workspaceId: string;
-  workspaceSlug: "demo" | "primary";
+  workspaceSlug: "demo" | "primary" | "demo-session";
   /** "demo-fixture" or "real" — which scan engine serves this scope. */
   scanEngine: "demo-fixture" | "real";
 };
 
+async function ensureDemoSessionWorkspace(sessionId: string) {
+  const slug = `${DEMO_SESSION_PREFIX}${sessionId}`;
+  const existing = await db.workspace.findUnique({ where: { slug } });
+  if (existing) return existing;
+
+  // Create + seed inside ONE transaction. The workspace row only becomes
+  // visible when the whole synthetic dataset is committed, and the unique
+  // slug index serialises parallel first-visit requests (dashboard, scans
+  // and branding all firing together): losers block on the insert until the
+  // winner commits, fail with a unique violation, and re-read a fully
+  // seeded workspace — nobody ever observes a half-seeded demo.
+  try {
+    return await db.$transaction(async (tx) => {
+      const workspace = await tx.workspace.create({
+        data: { slug, name: "Demo Session (Synthetic)" },
+      });
+      await seedDemoSessionWorkspace(workspace.id, tx);
+      return workspace;
+    });
+  } catch {
+    // Lost the race (same instance or serverless multi-instance): the
+    // winner's transaction has committed by now.
+    return db.workspace.findUniqueOrThrow({ where: { slug } });
+  }
+}
+
 export async function resolveContext(scope: Scope): Promise<WorkspaceContext> {
+  // Public demo scope: the caller's own session workspace. The session id
+  // comes from the ls_demo_sid cookie assigned by middleware, so every
+  // anonymous visitor's demo state is isolated.
+  if (scope === "demo") {
+    const sid = (await cookies()).get(DEMO_SESSION_COOKIE)?.value;
+    if (isValidDemoSessionId(sid)) {
+      const workspace = await ensureDemoSessionWorkspace(sid);
+      return {
+        scope,
+        workspaceId: workspace.id,
+        workspaceSlug: "demo-session",
+        scanEngine: PRODUCT.publicScannerEnabled ? "real" : "demo-fixture",
+      };
+    }
+    // No session cookie (middleware bypassed / non-browser caller): the
+    // legacy shared demo workspace keeps the demo functional.
+  }
+
   const slug: "demo" | "primary" =
     scope === "demo" ? "demo" : PRODUCT.demoMode ? "demo" : "primary";
 

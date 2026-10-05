@@ -22,10 +22,14 @@ function boolEnv(name: string, fallback: boolean): boolean {
 export const PRODUCT = {
   name: process.env.NEXT_PUBLIC_PRODUCT_NAME || "LandingSentinel",
   tagline: "Paid-media landing-page preflight",
-  version: "0.1.1",
-  releaseName: "Commercial Hardening",
+  version: "0.1.2",
+  releaseName: "Production Polish",
   price: "£349",
   priceLine: "One-time payment · Founding agency licence",
+
+  // Public one-page checker (marketing site sales tool). Can be disabled
+  // per deployment with NEXT_PUBLIC_PAGE_CHECK_ENABLED=false.
+  pageCheckEnabled: boolEnv("NEXT_PUBLIC_PAGE_CHECK_ENABLED", true),
 
   // Seller / portfolio references (marketing site only)
   portfolioUrl: process.env.NEXT_PUBLIC_PORTFOLIO_URL || "",
