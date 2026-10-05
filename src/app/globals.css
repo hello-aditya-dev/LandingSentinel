@@ -1,0 +1,395 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   LandingSentinel — Premium paper operations dossier
+   Light-only by design. Warm paper, deep ink, hairline rules,
+   print-style stamps. Dark mode is intentionally not shipped.
+   ============================================================ */
+
+@theme inline {
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-card: var(--paper-raised);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--paper-raised);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--ink);
+  --color-primary-foreground: var(--paper);
+  --color-secondary: var(--paper-deep);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--paper-deep);
+  --color-muted-foreground: var(--ink-2);
+  --color-accent: var(--paper-deep);
+  --color-accent-foreground: var(--ink);
+  --color-destructive: var(--critical);
+  --color-destructive-foreground: var(--paper);
+  --color-border: var(--hairline);
+  --color-input: var(--hairline);
+  --color-ring: var(--ink);
+
+  /* Paper system */
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-hairline: var(--hairline);
+  --color-hairline-strong: var(--hairline-strong);
+  --color-critical: var(--critical);
+  --color-critical-wash: var(--critical-wash);
+  --color-warning: var(--warning);
+  --color-warning-wash: var(--warning-wash);
+  --color-healthy: var(--healthy);
+  --color-healthy-wash: var(--healthy-wash);
+  --color-evidence: var(--evidence);
+  --color-evidence-wash: var(--evidence-wash);
+  --color-brand-accent: var(--brand-accent);
+
+  --font-sans: var(--font-sans-face);
+  --font-serif: var(--font-display-face);
+  --font-mono: var(--font-mono-face);
+
+  --radius-sm: 0px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 8px;
+}
+
+:root {
+  /* Paper + ink */
+  --paper: #f4f0e7;
+  --paper-raised: #faf8f2;
+  --paper-deep: #ece7db;
+  --ink: #181714;
+  --ink-2: #57534c;
+  --ink-3: #8a857b;
+  --hairline: #d9d2c5;
+  --hairline-strong: #bdb4a2;
+
+  /* Status — muted print colours */
+  --critical: #a7372d;
+  --critical-wash: #f3e2de;
+  --warning: #8a5a06;
+  --warning-wash: #f5e9cf;
+  --healthy: #42603a;
+  --healthy-wash: #e6ecdd;
+  --evidence: #2f5f8f;
+  --evidence-wash: #e4ecf4;
+
+  /* White-label accent (set at runtime from branding settings) */
+  --brand-accent: #a7372d;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans-face), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Paper materiality -------------------------------------- */
+
+/* Very subtle fibre/noise across the whole sheet (≈2% effective). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Faint horizontal rules on the main sheet (ledger feel). */
+.paper-rules {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    color-mix(in srgb, var(--hairline) 45%, transparent) 31px,
+    color-mix(in srgb, var(--hairline) 45%, transparent) 32px
+  );
+}
+
+/* A raised sheet of paper — evidence panel / report section. */
+.paper-sheet {
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  box-shadow:
+    0 1px 2px rgb(24 23 20 / 0.04),
+    0 8px 24px -18px rgb(24 23 20 / 0.18);
+}
+
+/* Thin pressed-in edge, like a sheet glued into a binder. */
+.paper-pressed {
+  background: var(--paper-raised);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--hairline-strong);
+}
+
+/* --- Typography helpers ------------------------------------- */
+
+.font-display {
+  font-family: var(--font-display-face), Georgia, serif;
+}
+
+.micro-label {
+  font-family: var(--font-mono-face), monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Long URLs / campaign names must never break layout. */
+.url-wrap {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* --- Status stamps ------------------------------------------ */
+
+.stamp {
+  --stamp-rot: -4deg;
+  --stamp-color: var(--ink);
+  --stamp-wash: transparent;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  transform: rotate(var(--stamp-rot));
+  border: 2px solid var(--stamp-color);
+  border-radius: 3px;
+  color: var(--stamp-color);
+  background: var(--stamp-wash);
+  font-family: var(--font-mono-face), monospace;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: inset 0 0 0 1px var(--stamp-wash);
+  /* faint double impression ring */
+  outline: 1px solid color-mix(in srgb, var(--stamp-color) 25%, transparent);
+  outline-offset: 3px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='2'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.9 0.9 0.9 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)' fill='%23000'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='2'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.9 0.9 0.9 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23d)' fill='%23000'/%3E%3C/svg%3E");
+  -webkit-mask-size: 120px 120px;
+  mask-size: 120px 120px;
+}
+
+.stamp-lg {
+  padding: 0.6rem 1.4rem;
+  font-size: 1.05rem;
+  border-width: 3px;
+}
+
+.stamp-critical {
+  --stamp-color: var(--critical);
+  --stamp-wash: color-mix(in srgb, var(--critical) 8%, transparent);
+}
+.stamp-warning {
+  --stamp-color: var(--warning);
+  --stamp-wash: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+.stamp-healthy {
+  --stamp-color: var(--healthy);
+  --stamp-wash: color-mix(in srgb, var(--healthy) 8%, transparent);
+}
+.stamp-ink {
+  --stamp-color: var(--ink);
+}
+
+/* Physical stamp motion on scan completion. */
+@keyframes stamp-in {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--stamp-rot)) scale(1.7);
+  }
+  55% {
+    opacity: 1;
+    transform: rotate(var(--stamp-rot)) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--stamp-rot)) scale(1);
+  }
+}
+
+.stamp-animate {
+  animation: stamp-in 320ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* --- Inspection sweep (scanning rows) ----------------------- */
+
+@keyframes inspect-sweep {
+  0% {
+    left: -12%;
+  }
+  100% {
+    left: 104%;
+  }
+}
+
+.inspect-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.inspect-row::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10%;
+  min-width: 48px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--evidence) 16%, transparent),
+    transparent
+  );
+  border-right: 1px solid color-mix(in srgb, var(--evidence) 45%, transparent);
+  animation: inspect-sweep 1.4s linear infinite;
+}
+
+/* --- Ledger rows -------------------------------------------- */
+
+.ledger-row {
+  border-bottom: 1px solid var(--hairline);
+  transition: background-color 150ms ease;
+}
+
+.ledger-row:hover {
+  background: color-mix(in srgb, var(--paper-deep) 55%, transparent);
+}
+
+/* --- Registration marks / dossier details -------------------- */
+
+.reg-mark {
+  font-family: var(--font-mono-face), monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  user-select: none;
+}
+
+/* Dotted annotation underline (margin-note feel). */
+.annotated {
+  text-decoration: underline dotted var(--hairline-strong);
+  text-underline-offset: 3px;
+}
+
+/* --- Focus ---------------------------------------------------- */
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* --- Custom scrollbars for long lists ------------------------- */
+
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+
+.thin-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 0;
+}
+
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* --- Reduced motion ------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .inspect-row::after {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Print — client report dossier
+   ============================================================ */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .print-break-avoid {
+    break-inside: avoid;
+  }
+
+  .print-break-before {
+    break-before: page;
+  }
+
+  .print-url,
+  .url-wrap {
+    word-break: break-all !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  .print-row-avoid {
+    break-inside: avoid;
+  }
+}

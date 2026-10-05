@@ -1,0 +1,257 @@
+// LandingSentinel — data model
+// Money is stored as integer minor units (e.g. pence) with a separate ISO
+// currency code. Never use floating point for financial values.
+// SQLite is used for the bundled development/demo deployment; the schema is
+// provider-portable (switch `provider` to "postgresql" with a matching
+// DATABASE_URL for production — see DEPLOYMENT.md).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  slug      String   @unique // "demo" | "primary"
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branding     Branding?
+  clients      Client[]
+  importBatches ImportBatch[]
+  destinations Destination[]
+  scans        Scan[]
+  expectations ScanExpectation[]
+}
+
+model Client {
+  id                String    @id @default(cuid())
+  workspaceId       String
+  name              String
+  externalReference String?
+  createdAt         DateTime  @default(now())
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  importBatches ImportBatch[]
+  scans         Scan[]
+
+  @@index([workspaceId])
+}
+
+model Branding {
+  id                String   @id @default(cuid())
+  workspaceId       String   @unique
+  productName       String   @default("LandingSentinel")
+  agencyName        String   @default("")
+  logoUrl           String?
+  accentColor       String   @default("#A7372D")
+  supportEmail      String?
+  website           String?
+  reportFooter      String?
+  reportContactName String?
+  updatedAt         DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ImportBatch {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  clientId         String?
+  filename         String
+  platform         String? // dominant detected platform
+  currency         String
+  originalRowCount Int
+  validRowCount    Int
+  rejectedRowCount Int
+  demo             Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client       Client?       @relation(fields: [clientId], references: [id])
+  campaignRows CampaignRow[]
+  scans        Scan[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model CampaignRow {
+  id            String   @id @default(cuid())
+  importBatchId String
+  platform      String?
+  campaignName  String?
+  adGroupName   String?
+  adName        String?
+  originalUrl   String
+  spendMinor    Int
+  currency      String
+  rawRow        Json
+  createdAt     DateTime @default(now())
+
+  importBatch     ImportBatch          @relation(fields: [importBatchId], references: [id], onDelete: Cascade)
+  destinationLinks DestinationCampaign[]
+
+  @@index([importBatchId])
+}
+
+model Destination {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  normalizedKey    String
+  representativeUrl String
+  hostname         String
+  pathname         String
+  createdAt        DateTime @default(now())
+
+  workspace     Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignLinks DestinationCampaign[]
+  scanTargets   ScanTarget[]
+
+  @@unique([workspaceId, normalizedKey])
+  @@index([workspaceId])
+}
+
+model DestinationCampaign {
+  id            String @id @default(cuid())
+  campaignRowId String
+  destinationId String
+  spendMinor    Int
+
+  campaignRow CampaignRow @relation(fields: [campaignRowId], references: [id], onDelete: Cascade)
+  destination Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@index([destinationId])
+  @@index([campaignRowId])
+}
+
+model Scan {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  clientId        String?
+  importBatchId   String?
+  label           String?
+  state           String // pending | running | complete | partial | failed
+  engine          String // real | demo-fixture
+  currency        String
+  totalSpendMinor Int
+  readinessScore  Int?
+  preflightStatus String? // DO_NOT_LAUNCH | REVIEW_BEFORE_LAUNCH | LAUNCH_READY
+  stats           Json?
+  variant         String    @default("live") // live | fixed (demo "after fixes" state)
+  demo            Boolean   @default(false)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId], references: [id])
+  importBatch  ImportBatch? @relation(fields: [importBatchId], references: [id])
+  targets      ScanTarget[]
+  reports      Report[]
+  findings     Finding[]
+
+  @@index([workspaceId, createdAt])
+}
+
+model ScanTarget {
+  id                   String    @id @default(cuid())
+  scanId               String
+  destinationId        String
+  originalUrl          String
+  finalUrl             String?
+  associatedSpendMinor Int
+  state                String // queued | running | complete | failed
+  stage                String? // dns | request | redirects | inspect | persist
+  httpStatus           Int?
+  responseTimeMs       Int?
+  contentType          String?
+  bytesInspected       Int?
+  redirectCount        Int?
+  trackerSummary       Json?
+  error                Json?
+  orderIndex           Int
+  startedAt            DateTime?
+  completedAt          DateTime?
+
+  scan        Scan         @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  destination Destination  @relation(fields: [destinationId], references: [id])
+  redirects   RedirectHop[]
+  findings    Finding[]
+
+  @@index([scanId])
+  @@index([destinationId])
+}
+
+model RedirectHop {
+  id           String  @id @default(cuid())
+  scanTargetId String
+  sequence     Int
+  fromUrl      String
+  toUrl        String
+  statusCode   Int
+  durationMs   Int?
+
+  scanTarget ScanTarget @relation(fields: [scanTargetId], references: [id], onDelete: Cascade)
+
+  @@index([scanTargetId])
+}
+
+model Finding {
+  id                  String    @id @default(cuid())
+  scanId              String
+  scanTargetId        String
+  findingKey          String // destination normalizedKey + "::" + checkId (stable identity across scans)
+  checkId             String
+  severity            String // critical | warning | info
+  confidence          String // confirmed | high | heuristic | needs_verification
+  title               String
+  summary             String
+  explanation         String
+  recommendation      String?
+  associatedSpendMinor Int
+  currency            String
+  evidence            Json
+  metadata            Json?
+  firstSeenAt         DateTime?
+  lastSeenAt          DateTime?
+  resolvedAt          DateTime?
+
+  scan        Scan       @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  scanTarget  ScanTarget @relation(fields: [scanTargetId], references: [id], onDelete: Cascade)
+
+  @@unique([scanId, findingKey])
+  @@index([scanId])
+  @@index([scanTargetId])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  scanId      String
+  title       String
+  generatedAt DateTime @default(now())
+  branding    Json // snapshot of branding at generation time
+  scan        Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+}
+
+model ScanExpectation {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  destinationKey   String
+  expectedTracker  String? // platform key whose signature is expected
+  expectedText     String?
+  expectedForm     Boolean?
+  expectedHostname String?
+  createdAt        DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, destinationKey])
+  @@index([workspaceId])
+}

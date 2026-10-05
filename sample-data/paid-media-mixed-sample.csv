@@ -1,0 +1,7 @@
+Platform,Campaign,Ad group,Final URL,Amount spent,Currency
+TikTok,"Old Offer Remarketing",,https://northstar-outfitters.test/old-offer?utm_source=tiktok&utm_campaign=legacy,500.00,GBP
+LinkedIn,"Gift Guide — Sponsored Content","Function — Outdoor",https://northstar-outfitters.test/gift-guide?utm_source=linkedin&utm_campaign=gift-guide,1040.00,GBP
+TikTok,"Trail Series — Spark Ads","Spark — Creators",https://shop.northstar-outfitters.test/trail-series?utm_source=tiktok&utm_campaign=trail-series,2530.00,GBP
+LinkedIn,"Loyalty Signup — Lead Gen","Lead Form — Members",https://shop.northstar-outfitters.test/loyalty-signup?utm_source=linkedin&utm_campaign=loyalty,1240.00,GBP
+LinkedIn,"Contact — Lead Gen","Lead Form",https://shop.northstar-outfitters.test/contact?utm_source=linkedin&utm_campaign=contact,990.00,GBP
+TikTok,"Accessories — Prospecting","Broad",https://shop.northstar-outfitters.test/accessories?utm_source=tiktok&utm_campaign=accessories,4090.00,GBP

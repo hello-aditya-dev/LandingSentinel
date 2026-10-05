@@ -1,0 +1,14 @@
+Platform,Campaign,Ad group,Final URL,Amount spent,Currency
+Meta,"Prospecting — Summer Sale","Broad — Interests",https://shop.northstar-outfitters.test/summer-sale?utm_source=meta&utm_campaign=summer-sale&utm_content=carousel-a,1700.00,GBP
+Meta,"Retargeting — Summer Sale","30d Site Visitors",https://shop.northstar-outfitters.test/summer-sale?utm_source=meta&utm_campaign=summer-sale&utm_content=static-b,2200.00,GBP
+Meta,"Adv+ Broad — Summer","Adv+ Auto",https://shop.northstar-outfitters.test/summer-sale?utm_source=meta&utm_campaign=summer-sale&utm_content=video-c,900.00,GBP
+Meta,"Spring Prospecting","Lookalike 1%",https://shop.northstar-outfitters.test/products/shoes?utm_source=meta&utm_campaign=spring-sale,1750.00,GBP
+Meta,"Spring Retargeting","Cart Abandoners 7d",https://shop.northstar-outfitters.test/products/shoes?utm_source=meta&utm_campaign=spring-sale,1500.00,GBP
+Meta,"Legacy Offers — Prospecting",,https://northstar-outfitters.test/old-offer?utm_source=meta&utm_campaign=legacy,800.00,GBP
+Meta,"Winter Knitwear — Retargeting","14d ViewContent",https://shop.northstar-outfitters.test/winter-knitwear?utm_source=meta&utm_campaign=winter-knitwear,3980.00,GBP
+Meta,"Gift Guide — Prospecting","Interests — Gifting",https://northstar-outfitters.test/gift-guide?utm_source=meta&utm_campaign=gift-guide,1600.00,GBP
+Meta,"Trail Series — Video","Video — Thru-hike",https://shop.northstar-outfitters.test/trail-series?utm_source=meta&utm_campaign=trail-series,3200.00,GBP
+Meta,"Always On — Prospecting","Broad",https://shop.northstar-outfitters.test/?utm_source=meta&utm_campaign=always-on,7500.00,GBP
+Meta,"Always On — Retargeting","60d Visitors",https://shop.northstar-outfitters.test/?utm_source=meta&utm_campaign=always-on,4250.00,GBP
+Meta,"Gift Cards — Retargeting","90d Purchasers",https://shop.northstar-outfitters.test/gift-cards?utm_source=meta&utm_campaign=gift-cards,3480.00,GBP
+Meta,"Womens — Prospecting","Interests — Hiking",https://shop.northstar-outfitters.test/womens?utm_source=meta&utm_campaign=womens,8120.00,GBP

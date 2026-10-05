@@ -1,0 +1,495 @@
+   400→   400→  if (removedPrimary.length > 0) {
+   401→   401→    const param = removedPrimary[0];
+   402→   402→    findings.push({
+   403→   403→      key: "param_removed_primary",
+   404→   404→      checkId: CHECK_IDS.attribution,
+   405→   405→      severity: "critical",
+   406→   406→      confidence: "confirmed",
+   407→   407→      title: "Campaign parameter removed after redirect",
+   408→   408→      summary: `The imported destination contained ${param.param}=${param.originalValue}. The final URL does not contain this parameter. ${spendText} of campaign spend points here.`,
+   409→   409→      explanation:
+   410→   410→        "The redirect chain drops a primary campaign parameter. Analytics that read UTM parameters from the landing URL will not attribute these visits to the imported campaign values.",
+   411→   411→      recommendation:
+   412→   412→        "Verify whether attribution is preserved through another mechanism (for example server-side tagging). If it is not, update the redirect or the campaign destination before launch.",
+   413→   413→      evidence: [
+   414→   414→        {
+   415→   415→          type: "PARAMETER_REMOVED",
+   416→   416→          label: `Removed parameter: ${param.param}`,
+   417→   417→          value: `${param.param}=${param.originalValue ?? ""}`,
+   418→   418→          meta: { finalUrl: fetch.finalUrl, redirects: fetch.redirects.length },
+   419→   419→        },
+   420→   420→        ...hopList,
+   421→   421→        { type: "FINAL_URL", label: "Final URL", value: fetch.finalUrl },
+   422→   422→      ],
+   423→   423→      metadata: { removedParams: removedPrimary.map((d) => d.param) },
+   424→   424→    });
+   425→   425→  }
+   426→   426→
+   427→   427→  if (removedSecondary.length > 0) {
+   428→   428→    findings.push({
+   429→   429→      key: "param_removed_secondary",
+   430→   430→      checkId: CHECK_IDS.attribution,
+   431→   431→      severity: "warning",
+   432→   432→      confidence: "confirmed",
+   433→   433→      title: "Secondary campaign parameter removed after redirect",
+   434→   434→      summary: `${removedSecondary.map((d) => d.param).join(", ")} ${removedSecondary.length === 1 ? "was" : "were"} present in the imported URL and absent from the final URL.`,
+   435→   435→      explanation:
+   436→   436→        "These parameters support content- and term-level reporting. Their removal limits ad-level or keyword-level analysis in analytics that reads them from the URL.",
+   437→   437→      recommendation: "Verify whether your analytics setup preserves these values by another method.",
+   438→   438→      evidence: removedSecondary.map((d) => ({
+   439→   439→        type: "PARAMETER_REMOVED" as const,
+   440→   440→        label: `Removed parameter: ${d.param}`,
+   441→   441→        value: `${d.param}=${d.originalValue ?? ""}`,
+   442→   442→        meta: { finalUrl: fetch.finalUrl },
+   443→   443→      })),
+   444→   444→    });
+   445→   445→  }
+   446→   446→
+   447→   447→  if (removedClickIds.length > 0) {
+   448→   448→    findings.push({
+   449→   449→      key: "param_removed_click_id",
+   450→   450→      checkId: CHECK_IDS.attribution,
+   451→   451→      severity: "warning",
+   452→   452→      confidence: "needs_verification",
+   453→   453→      title: "Click ID removed after redirect",
+   454→   454→      summary: `${removedClickIds.map((d) => d.param).join(", ")} ${removedClickIds.length === 1 ? "was" : "were"} in the imported URL and absent from the final URL.`,
+   455→   455→      explanation:
+   456→   456→        "Click IDs normally travel in the landing URL and are captured for platform-side conversion measurement. A redirect that strips them can still be correct if the platform redirects them onward itself or measurement is server-side.",
+   457→   457→      recommendation:
+   458→   458→        "Verify with your tag debugger or the platform's conversion diagnostics whether click IDs are captured for this destination.",
+   459→   459→      evidence: removedClickIds.map((d) => ({
+   460→   460→        type: "PARAMETER_REMOVED" as const,
+   461→   461→        label: `Removed parameter: ${d.param}`,
+   462→   462→        value: `${d.param}=${d.originalValue ?? ""}`,
+   463→   463→        meta: { finalUrl: fetch.finalUrl },
+   464→   464→      })),
+   465→   465→    });
+   466→   466→  }
+   467→   467→
+   468→   468→  for (const change of changed) {
+   469→   469→    findings.push({
+   470→   470→      key: `param_changed_${change.param}`,
+   471→   471→      checkId: CHECK_IDS.attribution,
+   472→   472→      severity: "warning",
+   473→   473→      confidence: "confirmed",
+   474→   474→      title: "Campaign parameter changed after redirect",
+   475→   475→      summary: `${change.param} was "${change.originalValue}" in the imported URL and "${change.finalValue}" in the final URL.`,
+   476→   476→      explanation: "A redirect rewrote the parameter value. Analytics will attribute these visits to the new value, not the value in your campaign rows.",
+   477→   477→      recommendation: "Check the redirect rules for this destination if the original value is the intended one.",
+   478→   478→      evidence: [
+   479→   479→        {
+   480→   480→          type: "PARAMETER_CHANGED",
+   481→   481→          label: `Changed parameter: ${change.param}`,
+   482→   482→          value: `${change.originalValue} → ${change.finalValue}`,
+   483→   483→        },
+   484→   484→        ...hopList,
+   485→   485→      ],
+   486→   486→    });
+   487→   487→  }
+   488→   488→
+   489→   489→  if (findings.length === 0 && preserved.length > 0) {
+   490→   490→    findings.push({
+   491→   491→      key: "attribution_preserved",
+   492→   492→      checkId: CHECK_IDS.attribution,
+   493→   493→      severity: "info",
+   494→   494→      confidence: "confirmed",
+   495→   495→      title: "Redirect occurred, attribution parameters preserved",
+   496→   496→      summary: `The destination redirected ${fetch.redirects.length} ${fetch.redirects.length === 1 ? "time" : "times"} and all ${preserved.length} campaign parameters survived to the final URL.`,
+   497→   497→      explanation:
+   498→   498→        "The final URL still contains the imported campaign parameters, so URL-based analytics attribution is not interrupted by the redirect.",
+   499→   499→      evidence: [
+   500→   500→        ...preserved.map((p) => ({
+   501→   501→          type: "PARAMETER_PRESERVED" as const,
+   502→   502→          label: `Preserved: ${p.param}`,
+   503→   503→          value: `${p.param}=${p.originalValue ?? ""}`,
+   504→   504→        })),
+   505→   505→        ...hopList,
+   506→   506→      ],
+   507→   507→    });
+   508→   508→  }
+   509→   509→
+   510→   510→  return findings;
+   511→   511→}
+   512→   512→
+   513→   513→/* -------------------------------------------------------------- */
+   514→   514→/* Tracking findings (platform-aware)                             */
+   515→   515→/* -------------------------------------------------------------- */
+   516→   516→
+   517→   517→function trackingEvidenceLine(trackers: TrackerDetection[], key: TrackerKey): EvidenceItem {
+   518→   518→  const t = trackers.find((tr) => tr.key === key);
+   519→   519→  return {
+   520→   520→    type: t?.detected ? "TRACKER_SIGNATURE" : "TRACKER_ABSENT",
+   521→   521→    label: trackerLabel(key),
+   522→   522→    value: t?.detected ? `Detected — signature "${t.signatureId}"` : "Not detected in retrieved HTML",
+   523→   523→    snippet: t?.excerpt ?? undefined,
+   524→   524→  };
+   525→   525→}
+   526→   526→
+   527→   527→function trackingFindings(ctx: ScanContext, trackers: TrackerDetection[]): FindingDraft[] {
+   528→   528→  const findings: FindingDraft[] = [];
+   529→   529→  const gtmPresent = trackers.find((t) => t.key === "gtm")?.detected ?? false;
+   530→   530→  const spendText = fmtSpend(ctx.associatedSpendMinor, ctx.currency);
+   531→   531→
+   532→   532→  const platforms = [...new Set(ctx.platforms)];
+   533→   533→  for (const platform of platforms) {
+   534→   534→    const relevant = platformRelevantTrackers(platform);
+   535→   535→    if (relevant.length === 0) continue;
+   536→   536→
+   537→   537→    const anyDetected = relevant.some((key) => trackers.find((t) => t.key === key)?.detected);
+   538→   538→    if (anyDetected) continue;
+   539→   539→
+   540→   540→    const platformName: Record<string, string> = {
+   541→   541→      meta: "Meta",
+   542→   542→      google: "Google Ads",
+   543→   543→      tiktok: "TikTok",
+   544→   544→      linkedin: "LinkedIn",
+   545→   545→    };
+   546→   546→    const platformLabel = platformName[platform] ?? platform;
+   547→   547→    const relevantLabels = relevant.map((k) => trackerLabel(k)).join(" / ");
+   548→   548→
+   549→   549→    const baseEvidence: EvidenceItem[] = [
+   550→   550→      { type: "TRACKER_ABSENT", label: `Imported platform: ${platformLabel}`, value: `${platformLabel} campaign spend is associated with this destination` },
+   551→   551→      ...relevant.map((k) => trackingEvidenceLine(trackers, k)),
+   552→   552→      trackingEvidenceLine(trackers, "gtm"),
+   553→   553→    ];
+   554→   554→
+   555→   555→    if (!gtmPresent) {
+   556→   556→      findings.push({
+   557→   557→        key: `tracking_absent_${platform}`,
+   558→   558→        checkId: CHECK_IDS.tracking,
+   559→   559→        severity: "critical",
+   560→   560→        confidence: "high",
+   561→   561→        title: `${platformLabel} tracking was not detected`,
+   562→   562→        summary: `${spendText} of ${platformLabel} campaign spend points at this destination, and no ${platformLabel} tracking signature or tag manager was detected in the retrieved HTML.`,
+   563→   563→        explanation: `Imported platform: ${platformLabel}. ${relevantLabels}: not detected. Google Tag Manager: not detected. Static HTML scanning cannot prove what happens after JavaScript runs, but with no direct signature and no tag manager present, nothing in the retrieved page would load a ${platformLabel} tag.`,
+   564→   564→        recommendation: `Open the rendered page with a tag debugger (for example ${platformLabel === "Meta" ? "Meta Pixel Helper" : "the platform's tag diagnostics"}) and confirm whether tracking loads at runtime. If it does not, install tracking before spending against this destination.`,
+   565→   565→        evidence: baseEvidence,
+   566→   566→        metadata: { platform, relevantTrackers: relevant },
+   567→   567→      });
+   568→   568→    } else {
+   569→   569→      findings.push({
+   570→   570→        key: `tracking_absent_${platform}`,
+   571→   571→        checkId: CHECK_IDS.tracking,
+   572→   572→        severity: "warning",
+   573→   573→        confidence: "needs_verification",
+   574→   574→        title: `${relevantLabels} was not detected directly`,
+   575→   575→        summary: `${spendText} of ${platformLabel} campaign spend points here. Google Tag Manager is present; a tag can load at runtime.`,
+   576→   576→        explanation: `Google Tag Manager is detected in the retrieved HTML. A ${relevantLabels} can load through GTM after the page runs. This static scan cannot confirm that behavior.`,
+   577→   577→        recommendation: `Open the rendered page with a tag debugger and verify the ${relevantLabels} fires before you treat this as a confirmed tracking failure.`,
+   578→   578→        evidence: baseEvidence,
+   579→   579→        metadata: { platform, relevantTrackers: relevant, gtmPresent: true },
+   580→   580→      });
+   581→   581→    }
+   582→   582→  }
+   583→   583→
+   584→   584→  const detected = trackers.filter((t) => t.detected);
+   585→   585→  if (detected.length > 0) {
+   586→   586→    findings.push({
+   587→   587→      key: "tracking_detected",
+   588→   588→      checkId: CHECK_IDS.tracking,
+   589→   589→      severity: "info",
+   590→   590→      confidence: "confirmed",
+   591→   591→      title: "Tracking signatures detected",
+   592→   592→      summary: `${detected.length} tracking ${detected.length === 1 ? "signature was" : "signatures were"} detected in the retrieved HTML.`,
+   593→   593→      explanation:
+   594→   594→        "Static detection proves the signature exists in the served HTML. It does not confirm that tags fire at runtime or that they are configured correctly.",
+   595→   595→      evidence: detected.map((t) => ({
+   596→   596→        type: "TRACKER_SIGNATURE",
+   597→   597→        label: trackerLabel(t.key),
+   598→   598→        value: `Detected — signature "${t.signatureId}"`,
+   599→   599→        snippet: t.excerpt ?? undefined,
+   600→   600→      })),
+   601→   601→    });
+   602→   602→  }
+   603→   603→
+   604→   604→  return findings;
+   605→   605→}
+   606→   606→
+   607→   607→/* -------------------------------------------------------------- */
+   608→   608→/* Content findings                                               */
+   609→   609→/* -------------------------------------------------------------- */
+   610→   610→
+   611→   611→function contentFindings(
+   612→   612→  fetch: Extract<PageFetchResult, { kind: "ok" }>,
+   613→   613→  ctx: ScanContext,
+   614→   614→  content: ReturnType<typeof inspectContent>
+   615→   615→): FindingDraft[] {
+   616→   616→  const findings: FindingDraft[] = [];
+   617→   617→  const spendText = fmtSpend(ctx.associatedSpendMinor, ctx.currency);
+   618→   618→
+   619→   619→  if (!content.title) {
+   620→   620→    findings.push({
+   621→   621→      key: "title_missing",
+   622→   622→      checkId: CHECK_IDS.content,
+   623→   623→      severity: "warning",
+   624→   624→      confidence: "confirmed",
+   625→   625→      title: "HTML title is missing or empty",
+   626→   626→      summary: `The retrieved page has no <title> content. ${spendText} of campaign spend points here.`,
+   627→   627→      explanation:
+   628→   628→        "The title element is empty or absent. Titles are used by browsers, search results, and some link previews. An empty title is a content defect on a paid landing page.",
+   629→   629→      recommendation: "Add a descriptive <title> to this page before launch.",
+   630→   630→      evidence: [
+   631→   631→        { type: "TITLE_TEXT", label: "Page title", value: "(empty)" },
+   632→   632→        { type: "HTML_SNIPPET", label: "HTML inspected", value: `${fetch.html.length} characters` },
+   633→   633→      ],
+   634→   634→    });
+   635→   635→  }
+   636→   636→
+   637→   637→  if (content.noindex) {
+   638→   638→    findings.push({
+   639→   639→      key: "noindex",
+   640→   640→      checkId: CHECK_IDS.content,
+   641→   641→      severity: "warning",
+   642→   642→      confidence: "confirmed",
+   643→   643→      title: "Page is marked noindex",
+   644→   644→      summary: `The page tells search engines not to index it. ${spendText} of campaign spend points here.`,
+   645→   645→      explanation:
+   646→   646→        "A robots meta rule contains noindex. This does not block paid traffic, but it keeps the page out of search results and some link previews. On a campaign landing page this is sometimes intentional.",
+   647→   647→      recommendation: "Confirm the noindex rule is intentional for this campaign page.",
+   648→   648→      evidence: [{ type: "META_ROBOTS", label: "Meta robots", value: "noindex" }],
+   649→   649→    });
+   650→   650→  }
+   651→   651→
+   652→   652→  if (content.maintenance.match) {
+   653→   653→    findings.push({
+   654→   654→      key: "maintenance_wording",
+   655→   655→      checkId: CHECK_IDS.content,
+   656→   656→      severity: "warning",
+   657→   657→      confidence: "high",
+   658→   658→      title: "Page shows maintenance or unavailable wording",
+   659→   659→      summary: `Matched text: "${content.maintenance.evidence ?? content.maintenance.phrase}". ${spendText} of campaign spend points here.`,
+   660→   660→      explanation:
+   661→   661→        "The page returned HTTP 200 but its text matches an unavailable/maintenance pattern. Paid visitors would see this wording instead of the intended page.",
+   662→   662→      recommendation: "Restore the intended page content before launch, then re-scan.",
+   663→   663→      evidence: [
+   664→   664→        { type: "MATCHED_TEXT", label: "Matched text", snippet: content.maintenance.evidence ?? undefined, value: content.maintenance.phrase ?? undefined },
+   665→   665→        { type: "HTTP_STATUS", label: "HTTP status", value: String(fetch.httpStatus) },
+   666→   666→      ],
+   667→   667→    });
+   668→   668→  }
+   669→   669→
+   670→   670→  if (content.soft404.match) {
+   671→   671→    findings.push({
+   672→   672→      key: "soft_404",
+   673→   673→      checkId: CHECK_IDS.content,
+   674→   674→      severity: "warning",
+   675→   675→      confidence: "heuristic",
+   676→   676→      title: "Possible soft 404",
+   677→   677→      summary: `The server returned HTTP 200, but the page text matches not-found wording. ${spendText} of campaign spend points here.`,
+   678→   678→      explanation:
+   679→   679→        "This is a heuristic finding. The page returned HTTP 200 while its title or prominent text contains not-found language. Verify in a browser before treating it as a confirmed failure.",
+   680→   680→      recommendation: "Open the destination in a normal browser and confirm what visitors see.",
+   681→   681→      evidence: [
+   682→   682→        { type: "HTTP_STATUS", label: "HTTP status", value: String(fetch.httpStatus) },
+   683→   683→        { type: "MATCHED_TEXT", label: "Signals", value: content.soft404.signals.join("; ").slice(0, 300), snippet: content.soft404.evidence ?? undefined },
+   684→   684→      ],
+   685→   685→    });
+   686→   686→  }
+   687→   687→
+   688→   688→  if (content.soldOut.match) {
+   689→   689→    findings.push({
+   690→   690→      key: "sold_out_wording",
+   691→   691→      checkId: CHECK_IDS.content,
+   692→   692→      severity: "warning",
+   693→   693→      confidence: "high",
+   694→   694→      title: "Sold-out or unavailable product wording detected",
+   695→   695→      summary: `Matched text: "${content.soldOut.evidence ?? content.soldOut.phrase}". ${spendText} of campaign spend points here.`,
+   696→   696→      explanation:
+   697→   697→        "The page text indicates the product is unavailable. The scanner reports page wording only — it does not know your inventory state.",
+   698→   698→      recommendation: "Confirm stock levels and pause or redirect campaigns if the product is unavailable.",
+   699→   699→      evidence: [
+   700→   700→        { type: "MATCHED_TEXT", label: "Matched text", snippet: content.soldOut.evidence ?? undefined, value: content.soldOut.phrase ?? undefined },
+   701→   701→        { type: "HTTP_STATUS", label: "HTTP status", value: String(fetch.httpStatus) },
+   702→   702→      ],
+   703→   703→    });
+   704→   704→  }
+   705→   705→
+   706→   706→  if (content.bodyTextLength < 200 && !content.soft404.match) {
+   707→   707→    findings.push({
+   708→   708→      key: "thin_content",
+   709→   709→      checkId: CHECK_IDS.content,
+   710→   710→      severity: "warning",
+   711→   711→      confidence: "heuristic",
+   712→   712→      title: "Extremely thin page content",
+   713→   713→      summary: `The visible body text is ${content.bodyTextLength} characters. ${spendText} of campaign spend points here.`,
+   714→   714→      explanation:
+   715→   715→        "The retrieved HTML contains very little visible text. The page may be broken, may require JavaScript to render its content, or may genuinely be minimal. This is a heuristic finding.",
+   716→   716→      recommendation: "Verify the rendered page in a browser. If content renders via JavaScript, treat this finding as informational.",
+   717→   717→      evidence: [
+   718→   718→        { type: "HTML_SNIPPET", label: "Body text length", value: `${content.bodyTextLength} characters` },
+   719→   719→        { type: "HTML_SNIPPET", label: "HTML size inspected", value: `${fetch.bytesInspected} bytes` },
+   720→   720→      ],
+   721→   721→    });
+   722→   722→  }
+   723→   723→
+   724→   724→  if (!content.hasCta) {
+   725→   725→    findings.push({
+   726→   726→      key: "cta_absent",
+   727→   727→      checkId: CHECK_IDS.content,
+   728→   728→      severity: "info",
+   729→   729→      confidence: "heuristic",
+   730→   730→      title: "No conventional call-to-action detected",
+   731→   731→      summary: "No button or prominent link matched common CTA wording in the retrieved HTML.",
+   732→   732→      explanation:
+   733→   733→        "Some valid landing pages use unconventional wording or image-based CTAs, or require JavaScript to render. Absence of a detected CTA is not a failure by itself.",
+   734→   734→      evidence: [{ type: "CTA_CHECK", label: "CTA scan", value: "No match in buttons or prominent links" }],
+   735→   735→    });
+   736→   736→  }
+   737→   737→
+   738→   738→  if (!content.metaDescription) {
+   739→   739→    findings.push({
+   740→   740→      key: "meta_description_missing",
+   741→   741→      checkId: CHECK_IDS.content,
+   742→   742→      severity: "info",
+   743→   743→      confidence: "confirmed",
+   744→   744→      title: "Meta description is missing",
+   745→   745→      summary: "The page has no meta description.",
+   746→   746→      explanation: "Minor SEO metadata issue. Not a landing-page failure.",
+   747→   747→      evidence: [{ type: "HTML_SNIPPET", label: "Meta description", value: "(absent)" }],
+   748→   748→    });
+   749→   749→  }
+   750→   750→
+   751→   751→  return findings;
+   752→   752→}
+   753→   753→
+   754→   754→/* -------------------------------------------------------------- */
+   755→   755→/* Performance findings                                           */
+   756→   756→/* -------------------------------------------------------------- */
+   757→   757→
+   758→   758→function performanceFindings(fetch: Extract<PageFetchResult, { kind: "ok" }>, ctx: ScanContext): FindingDraft[] {
+   759→   759→  const threshold = PRODUCT.scanner.slowResponseMs;
+   760→   760→  if (fetch.responseTimeMs < threshold) return [];
+   761→   761→  const spendText = fmtSpend(ctx.associatedSpendMinor, ctx.currency);
+   762→   762→  return [
+   763→   763→    {
+   764→   764→      key: "slow_response",
+   765→   765→      checkId: CHECK_IDS.performance,
+   766→   766→      severity: "warning",
+   767→   767→      confidence: "confirmed",
+   768→   768→      title: "Slow server response duration",
+   769→   769→      summary: `Server response duration: ${(fetch.responseTimeMs / 1000).toFixed(1)} s. ${spendText} of campaign spend points here.`,
+   770→   770→      explanation: `Measured from the scanner region. This is not a Core Web Vitals measurement and not a Lighthouse result. The threshold for this finding is ${(threshold / 1000).toFixed(0)} s.`,
+   771→   771→      recommendation: "Check origin performance (hosting, caching, backend) before launch.",
+   772→   772→      evidence: [
+   773→   773→        { type: "RESPONSE_TIME", label: "Server response duration", value: `${fetch.responseTimeMs} ms`, meta: { thresholdMs: threshold } },
+   774→   774→        { type: "HTTP_STATUS", label: "HTTP status", value: String(fetch.httpStatus) },
+   775→   775→      ],
+   776→   776→    },
+   777→   777→  ];
+   778→   778→}
+   779→   779→
+   780→   780→/* -------------------------------------------------------------- */
+   781→   781→/* Expectation findings (user-declared expected state)            */
+   782→   782→/* -------------------------------------------------------------- */
+   783→   783→
+   784→   784→function expectationFindings(
+   785→   785→  fetch: Extract<PageFetchResult, { kind: "ok" }>,
+   786→   786→  ctx: ScanContext,
+   787→   787→  content: ReturnType<typeof inspectContent>,
+   788→   788→  trackers: TrackerDetection[]
+   789→   789→): FindingDraft[] {
+   790→   790→  const findings: FindingDraft[] = [];
+   791→   791→  const exp = ctx.expectations;
+   792→   792→  if (!exp) return findings;
+   793→   793→  const spendText = fmtSpend(ctx.associatedSpendMinor, ctx.currency);
+   794→   794→
+   795→   795→  if (exp.expectedForm === true && !content.hasForm) {
+   796→   796→    findings.push({
+   797→   797→      key: "expected_form_missing",
+   798→   798→      checkId: CHECK_IDS.content,
+   799→   799→      severity: "warning",
+   800→   800→      confidence: "confirmed",
+   801→   801→      title: "Expected form not detected",
+   802→   802→      summary: `You declared that this destination should contain a form. No <form> element or known form embed was detected. ${spendText} of campaign spend points here.`,
+   803→   803→      explanation:
+   804→   804→        "The expected-state check compares your declaration with the retrieved HTML. JavaScript-rendered forms are not visible to this static scan.",
+   805→   805→      recommendation: "Verify the rendered page in a browser before treating this as a confirmed failure.",
+   806→   806→      evidence: [{ type: "FORM_CHECK", label: "Form scan", value: "No <form> or known form embed detected" }],
+   807→   807→    });
+   808→   808→  }
+   809→   809→
+   810→   810→  if (exp.expectedTracker) {
+   811→   811→    const t = trackers.find((tr) => tr.key === exp.expectedTracker);
+   812→   812→    if (t && !t.detected) {
+   813→   813→      findings.push({
+   814→   814→        key: `expected_tracker_${exp.expectedTracker}`,
+   815→   815→        checkId: CHECK_IDS.tracking,
+   816→   816→        severity: "warning",
+   817→   817→        confidence: "needs_verification",
+   818→   818→        title: `Expected tracker not detected: ${trackerLabel(exp.expectedTracker)}`,
+   819→   819→        summary: `You declared that ${trackerLabel(exp.expectedTracker)} should be present. It was not detected in the retrieved HTML.`,
+   820→   820→        explanation:
+   821→   821→          "The expected-state check compares your declaration with static signatures. A tag can load at runtime through a tag manager.",
+   822→   822→        recommendation: "Verify with a tag debugger on the rendered page.",
+   823→   823→        evidence: [
+   824→   824→          { type: "TRACKER_ABSENT", label: `Expected: ${trackerLabel(exp.expectedTracker)}`, value: "Not detected in retrieved HTML" },
+   825→   825→          trackingEvidenceLine(trackers, "gtm"),
+   826→   826→        ],
+   827→   827→      });
+   828→   828→    }
+   829→   829→  }
+   830→   830→
+   831→   831→  if (exp.expectedText && fetch.html.length > 0) {
+   832→   832→    const present = fetch.html.toLowerCase().includes(exp.expectedText.toLowerCase());
+   833→   833→    if (!present) {
+   834→   834→      findings.push({
+   835→   835→        key: "expected_text_missing",
+   836→   836→        checkId: CHECK_IDS.content,
+   837→   837→        severity: "warning",
+   838→   838→        confidence: "confirmed",
+   839→   839→        title: "Expected text not found",
+   840→   840→        summary: `You declared this destination should contain the text "${exp.expectedText}". It was not found in the retrieved HTML.`,
+   841→   841→        explanation: "The expected-state check searches the retrieved HTML for your declared text.",
+   842→   842→        recommendation: "Confirm the page still contains the intended copy.",
+   843→   843→        evidence: [{ type: "MATCHED_TEXT", label: "Expected text", value: exp.expectedText }],
+   844→   844→      });
+   845→   845→    }
+   846→   846→  }
+   847→   847→
+   848→   848→  if (exp.expectedHostname) {
+   849→   849→    try {
+   850→   850→      const final = new URL(fetch.finalUrl);
+   851→   851→      if (final.hostname.toLowerCase() !== exp.expectedHostname.toLowerCase()) {
+   852→   852→        findings.push({
+   853→   853→          key: "expected_hostname_mismatch",
+   854→   854→          checkId: CHECK_IDS.redirects,
+   855→   855→          severity: "warning",
+   856→   856→          confidence: "confirmed",
+   857→   857→          title: "Final hostname differs from the expected hostname",
+   858→   858→          summary: `You declared the final destination should be "${exp.expectedHostname}". The scan finished on "${final.hostname}".`,
+   859→   859→          explanation: "The expected-state check compares your declared hostname with the final URL after redirects.",
+   860→   860→          recommendation: "Check the redirect rules if the declared hostname is the intended one.",
+   861→   861→          evidence: [{ type: "FINAL_URL", label: "Final URL", value: fetch.finalUrl }],
+   862→   862→        });
+   863→   863→      }
+   864→   864→    } catch {
+   865→   865→      /* skip malformed */
+   866→   866→    }
+   867→   867→  }
+   868→   868→
+   869→   869→  return findings;
+   870→   870→}
+   871→   871→
+   872→   872→/* -------------------------------------------------------------- */
+   873→   873→/* Score + preflight (deterministic)                              */
+   874→   874→/* -------------------------------------------------------------- */
+   875→   875→
+   876→   876→export function destinationScore(findings: { severity: Severity }[]): number {
+   877→   877→  let score = 100;
+   878→   878→  for (const f of findings) {
+   879→   879→    if (f.severity === "critical") score -= 40;
+   880→   880→    else if (f.severity === "warning") score -= 12;
+   881→   881→    // Info findings do not reduce the score (documented rule).
+   882→   882→  }
+   883→   883→  return Math.max(0, score);
+   884→   884→}
+   885→   885→
+   886→   886→export function preflightStatus(findings: { severity: Severity }[]): "DO_NOT_LAUNCH" | "REVIEW_BEFORE_LAUNCH" | "LAUNCH_READY" {
+   887→   887→  if (findings.some((f) => f.severity === "critical")) return "DO_NOT_LAUNCH";
+   888→   888→  if (findings.some((f) => f.severity === "warning")) return "REVIEW_BEFORE_LAUNCH";
+   889→   889→  return "LAUNCH_READY";
+   890→   890→}
+   891→   891→
+   892→   892→export type { Confidence, FindingDraft };
+
+[showing lines 400-892 of 893; use offset=893 with limit to continue reading]
