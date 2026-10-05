@@ -60,3 +60,4 @@ agent-ctx/
 .zscripts/
 mini-services/
 public/*.log
+tool-results/
