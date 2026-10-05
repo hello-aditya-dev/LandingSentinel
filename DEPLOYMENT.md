@@ -1,19 +1,19 @@
 # Deployment
 
 Zero to a deployed LandingSentinel instance. Read SECURITY.md before putting
-a production deployment on the public internet — V1 ships without built-in
-authentication, and you are expected to put your own access protection in
-front of it.
+a production deployment on the public internet — it covers the access-control
+model, the SSRF protections and the known limitations.
 
 ## Prerequisites
 
 - Node.js 20 or newer (Node 24 recommended)
-- npm for installs and commands, plus Bun 1.x — the seed script
-  (`npm run db:seed`) and the shipped start script (`npm run start`) execute
-  through Bun
-- A PostgreSQL database for production (Neon, Supabase, RDS, or any hosted
-  Postgres). For local development and demo deployments, SQLite is bundled —
-  no database server is required.
+- npm for installs and commands (`package-lock.json` is committed, so
+  `npm install` is the supported, reproducible path)
+- A PostgreSQL database. PostgreSQL is the **canonical** database: hosted
+  (Neon, Supabase, Amazon RDS) or self-hosted. The Prisma schema ships with
+  the `postgresql` provider and the migrations are committed under
+  `prisma/migrations/` — **no provider editing is ever needed**. SQLite is not
+  supported in the commercial package.
 
 ## 1. Install
 
@@ -23,60 +23,60 @@ cd landing-sentinel
 npm install
 ```
 
+`npm install` also runs `prisma generate` (via `postinstall`), which produces
+the database client.
+
 ## 2. Environment file
 
 ```
 cp .env.example .env.local      # development
-cp .env.example .env            # production
+cp .env.example .env            # self-hosted production
 ```
 
 Then edit the file. Every variable is documented in CONFIGURATION.md. The
-minimum you must set is `DATABASE_URL`. The shipped buyer defaults are
-`DEMO_MODE=false` and `PUBLIC_SCANNER_ENABLED=false` — keep them that way for
-a production deployment.
+minimum you must set:
 
-## 3. Database provisioning
+- `DATABASE_URL` — your PostgreSQL connection string.
+- `ADMIN_PASSWORD_HASH` — the administrator password hash (next section).
+  Required for the default `APP_ACCESS_MODE=auth`.
 
-**Bundled development/demo (SQLite).** Do nothing beyond leaving
-`DATABASE_URL=file:./db/custom.db`. The file is created by `db:push`; no
-database server is involved.
+On Vercel (or any host with a dashboard), set the same variables in the
+project's environment settings instead.
 
-**Production (PostgreSQL).** LandingSentinel ships with the Prisma datasource
-set to `sqlite` so the bundled demo works out of the box. To use Postgres:
+The shipped buyer defaults are `DEMO_MODE=false` and
+`PUBLIC_SCANNER_ENABLED=false` — keep them that way for a production
+deployment.
 
-1. Provision a database (Neon, Supabase, or any hosted Postgres) and copy its
-   connection string.
-2. In `prisma/schema.prisma`, change the datasource provider from `"sqlite"`
-   to `"postgresql"`.
-3. Set `DATABASE_URL` to the Postgres connection string, for example
-   `postgresql://user:password@host/dbname?sslmode=require`.
-4. Run `npm run db:push` (or `npm run db:migrate`) against the new database —
-   see the next section.
+## 3. Database provisioning (PostgreSQL)
 
-The schema itself is provider-portable; no model changes are needed for the
-switch.
+Provision a PostgreSQL database and copy its connection string. Typical
+examples:
 
-## 4. Migrations
+| Host | Connection string shape |
+| --- | --- |
+| Neon | `postgresql://user:password@ep-xxxx.region.aws.neon.tech/landingsentinel?sslmode=require` |
+| Supabase | `postgresql://postgres.project-ref:password@aws-0-region.pooler.supabase.com:5432/postgres` (use the connection string from Project Settings → Database) |
+| Amazon RDS | `postgresql://user:password@your-instance.region.rds.amazonaws.com:5432/landingsentinel` |
+| Self-hosted | `postgresql://user:password@127.0.0.1:5432/landingsentinel` |
 
-Two paths, depending on how you want to manage schema history:
-
-- **`npm run db:push`** — syncs the schema directly from
-  `prisma/schema.prisma` to the database, with no migration files. This is the
-  right command for first setup and for single-deployment installs that do
-  not need a migration history.
-- **`npm run db:migrate`** — runs `prisma migrate dev`. Use this after you
-  change `prisma/schema.prisma` during development: it generates a migration
-  file under `prisma/migrations/`, applies it, and regenerates the client.
-  If you keep migration files, apply them to further environments with
-  `npx prisma migrate deploy`.
-
-First setup on a fresh database is normally just:
+Set it as `DATABASE_URL` in your env file, then apply the committed
+migrations:
 
 ```
-npm run db:push
+npm run db:migrate
 ```
 
-## 5. Seed (optional but recommended)
+`db:migrate` runs `prisma migrate deploy` through a small wrapper that loads
+`.env.local` then `.env` (real environment variables still win), so it works
+with either file. There is nothing to switch in `prisma/schema.prisma` — it
+already declares `provider = "postgresql"`.
+
+For Vercel: run `npm run db:migrate` once from your machine with
+`DATABASE_URL` pointing at the production database (or add it to the build
+command). Migrations are idempotent — `migrate deploy` only applies what is
+missing.
+
+## 4. Seed (optional but recommended)
 
 ```
 npm run db:seed
@@ -87,54 +87,83 @@ This rebuilds the synthetic demo workspace — a fictional client
 four historical scans and a client report. It is safe to run at any time; it
 only touches the demo workspace, never your primary workspace.
 
+## 5. Administrator password
+
+```
+npm run hash-password
+```
+
+The script prompts for a password (minimum 10 characters), confirms it, and
+prints an `ADMIN_PASSWORD_HASH=…` line. Put that line in your env file (or
+your host's dashboard) and restart the server. With the default
+`APP_ACCESS_MODE=auth`, every route operating on the real workspace then
+requires sign-in; the synthetic demo workspace stays public. Full model in
+SECURITY.md.
+
+If `ADMIN_PASSWORD_HASH` is unset while `APP_ACCESS_MODE=auth`, the real
+workspace is locked: the sign-in view and `/api/system` both say so, and the
+fix is exactly this step.
+
 ## 6. Development server
 
 ```
 npm run dev
 ```
 
-Opens on http://localhost:3000 (logs are also written to `dev.log`).
+Opens on http://localhost:3000 (logs are also written to `dev.log`). Plain
+HTTP on localhost is fine: browsers treat localhost as a secure context, so
+the session cookie works without TLS.
 
-## 7. Production build and start
+## 7. Production build and start (self-hosted)
 
 ```
 npm run build
 npm run start
 ```
 
-`npm run build` produces a Next.js standalone build in `.next/standalone`
-(and copies the static assets into it). `npm run start` runs that standalone
-server with `NODE_ENV=production` (through Bun, which is what the shipped
-script uses; `node .next/standalone/server.js` works equally well if you
-prefer plain Node). Put a reverse proxy with TLS in front of it (Caddy,
-nginx, Traefik) for a conventional deployment.
+`npm run build` is a standard `next build` — it fails on TypeScript errors
+(there is no ignore-build-errors switch; `npm run qa` and the build share the
+same type contract). `npm run start` runs `next start` on port 3000 with
+`NODE_ENV=production`, so the session cookie is marked `Secure` automatically.
+Serve it over HTTPS — put a reverse proxy with TLS in front (Caddy, nginx,
+Traefik) for a conventional deployment. Browsers only send `Secure` cookies
+over HTTPS (localhost excepted), so plain HTTP on a non-localhost host will
+break sign-in.
 
 ## 8. Vercel
 
 LandingSentinel can be deployed to Vercel. Points that matter:
 
+- **Environment variables** (Project → Settings → Environment Variables):
+  - `DATABASE_URL` — your PostgreSQL connection string (Neon and Supabase are
+    the common pairings; the SQLite-style file URL would not persist anyway).
+  - `ADMIN_PASSWORD_HASH` — generate with `npm run hash-password` locally and
+    paste the result.
+  - `APP_ACCESS_MODE` — optional; `auth` is the default. Only set it to
+    `open` for a private, trusted deployment (see SECURITY.md) — the better
+    Vercel alternative to disabling auth is platform-level protection
+    (Vercel Authentication / SSO or Cloudflare Access in front).
+  - Optional `SCAN_*` limits — see CONFIGURATION.md.
+  - `NEXT_PUBLIC_*` branding values are inlined at build time, so changing
+    them requires a redeploy.
 - **Node runtime.** All API routes — including the scanner routes — already
   declare `export const runtime = "nodejs"` in their source. The scanner uses
   Node APIs (DNS resolution, IP classification) that are not available in the
   edge runtime. No route config changes are needed.
-- **Function duration limits.** A scan start (`POST /api/scans`) returns
-  immediately with a scan id; the destinations are then processed in the
-  background while the UI polls `GET /api/scans/[id]`. A full scan covers up
-  to `SCAN_MAX_TARGETS` (default 25) destinations with bounded concurrency
-  (`SCAN_CONCURRENCY`, default 5) and per-request timeouts of
-  `SCAN_TIMEOUT_MS` (default 10 s) — worst case that is roughly a minute of
-  background work. Serverless function-duration limits can cut this short on
-  slower plans. **Leave the SCAN_* defaults unchanged** unless you have
-  measured what your plan allows; if you do raise them, raise the function
-  duration for the API routes accordingly. For predictable heavy scanning, a
+- **Scans run inside the request.** `POST /api/scans` executes the whole scan
+  — up to `SCAN_MAX_TARGETS` destinations — before responding; there is no
+  detached background work. The route declares `maxDuration = 60` (the
+  maximum available on every Vercel plan), and the whole-scan deadline
+  `SCAN_MAX_DURATION_MS` (default 55 000 ms) bounds the run below it:
+  destinations not reached in time are marked failed with
+  `SCAN_WINDOW_EXCEEDED` and the scan completes as `partial` instead of being
+  cut off silently. Progress during the request is observable by polling
+  `GET /api/scans/[id]` — each target's state is persisted as it completes.
+  On the Hobby plan the 60 s function limit applies; on Pro/Enterprise you
+  may raise the route's `maxDuration` and `SCAN_MAX_DURATION_MS` **together**
+  if you scan slower destinations. For predictable heavy scanning, a
   persistent Node host (VPS, container platform) is the simpler choice.
 - **Build command:** `npm run build`. **Install command:** `npm install`.
-- Set the environment variables from CONFIGURATION.md in the Vercel project
-  settings (or a committed `.env` — never commit real secrets). Remember that
-  `NEXT_PUBLIC_*` values are inlined at build time, so changing them requires
-  a redeploy.
-- Postgres for the database (see section 3) — the SQLite file would not
-  persist on Vercel.
 
 ## 9. Custom domain (optional)
 
@@ -145,26 +174,66 @@ application change is required.
 ## 10. Post-deployment health checks
 
 1. Visit `/api/system` — it should return a JSON envelope with
-   `ok: true` and the runtime configuration.
+   `ok: true`, the runtime configuration and a checks array (Node runtime,
+   database, schema, scanner, demo mode, public scanner, access control,
+   environment).
 2. In the app, open **Settings → System → Run system check** — the same
-   diagnostics through the UI.
+   diagnostics through the UI. The access-control check fails loudly when
+   `APP_ACCESS_MODE=auth` is set but `ADMIN_PASSWORD_HASH` is missing.
 3. Run the command-line check:
 
    ```
    npm run doctor
    ```
 
-   Expected output:
+   It verifies the Node version (≥ 20), the env file, `DATABASE_URL`, the
+   database connection, the schema (core tables queryable) and the scanner
+   configuration. It exits with code 1 if any check fails, so it can be used
+   in CI or post-deploy hooks. (On hosts without env files it accepts
+   `DATABASE_URL` from the process environment.)
+
+## 11. Verifying the real scanner locally
+
+You do not need live client URLs to watch the real engine work. The package
+ships a deterministic fixture server and a matching CSV:
+
+1. **Start the fixture server** (development only):
 
    ```
-   LandingSentinel system check
-   ✓ Node version (24.x)
-   ✓ Environment file (.env.local)
-   ✓ Database connection
-   ✓ Database schema
-   ✓ Scanner configuration (SCAN_MAX_TARGETS etc. set or defaults)
-   System ready.
+   npm run fixtures          # serves on http://127.0.0.1:4010
+   npm run fixtures -- 4111  # custom port
    ```
 
-   The script exits with code 1 if any check fails, so it can be used in CI
-   or post-deploy hooks.
+   It serves a healthy page (with trackers), redirects that preserve or drop
+   campaign parameters, a real 404, a real 500, a slow endpoint, a redirect
+   loop, tracker-rich and tracker-absent pages, a soft-404, a noindex page,
+   and a redirect to the cloud metadata endpoint (which must always stay
+   blocked).
+
+2. **Allow loopback targets — test flag, development only.** Add to
+   `.env.local` and restart the dev server:
+
+   ```
+   SCANNER_ALLOW_LOOPBACK_TARGETS=true
+   ```
+
+   The scanner blocks loopback by default. This flag relaxes **only**
+   loopback — the `localhost` hostname, `127.0.0.0/8` and `::1`. Cloud
+   metadata, private ranges, link-local and every other SSRF rule stay
+   enforced. It must never be enabled in production (SECURITY.md).
+
+3. **Import `sample-data/fixture-targets.csv`** through the import wizard
+   (14 rows pointing at `http://127.0.0.1:4010/…`, with the campaign
+   parameters each case needs).
+
+4. **Run a scan** from the app with the default buyer configuration
+   (`DEMO_MODE=false`). You are now watching the real engine: live HTTP,
+   manual redirects, tracker detection, content checks. Expected outcome:
+   the parameter-dropping redirect, 404, 500, timeout, loop, missing-tracker
+   and soft-404 destinations land as critical; the noindex page as a
+   warning; the metadata redirect is blocked and reported as an info
+   finding — the scan ends stamped DO NOT LAUNCH.
+
+5. **Remove the flag** from `.env.local` when you are done. The same
+   verification runs automatically in the scanner integration test
+   (`npm run test`) against a `*_test` database — see README.md → Testing.

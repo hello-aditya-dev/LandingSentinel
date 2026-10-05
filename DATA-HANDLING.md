@@ -6,8 +6,8 @@ client's data-protection questions without guessing.
 
 ## What is stored
 
-Everything lives in your own database (SQLite file or your PostgreSQL
-instance). Nothing is stored anywhere else.
+Everything lives in your own PostgreSQL database (hosted or self-hosted —
+wherever you point `DATABASE_URL`). Nothing is stored anywhere else.
 
 | Data | Detail |
 | --- | --- |
@@ -20,6 +20,7 @@ instance). Nothing is stored anywhere else.
 | Findings | Title, summary, explanation, recommendation, severity, confidence, associated spend, and the **structured evidence** (status codes, parameter diffs, tracker signature excerpts, DNS/TLS/timeout details). Plus incident history: first seen, last seen, resolved. |
 | Reports | Title, generation timestamp, and a snapshot of the branding at generation time. |
 | Branding | The white-label fields you save in Settings. |
+| Admin sessions | One row per administrator session: **only the SHA-256 hash of the opaque session-cookie token** (never the token itself), plus creation time, a `lastSeenAt` timestamp and the expiry. Rows are deleted on logout and when an expired session is observed. |
 
 The scanner does not keep page HTML. It reads the response body in memory,
 inspects it, stores findings and evidence excerpts, and discards the rest.
@@ -61,6 +62,10 @@ persist) is persisted in the database as scan-target state, which is what the
 scan progress panel shows.
 
 Logs never contain cookies, secrets, request bodies or full imported rows.
+Sign-in attempts produce nothing beyond the standard route-completion line
+(path and HTTP status — 401/429 tell the story); the administrator password
+is never logged, and the login rate-limit counter (5 failures per IP per
+15 minutes) is held **in memory only** and is never persisted anywhere.
 
 ## What never happens
 

@@ -7,8 +7,10 @@
  *   npm run hash-password -- "my passphrase"  # argument (quote it!)
  *
  * Prints an ADMIN_PASSWORD_HASH value for .env.local / your host's
- * environment variables. Format: scrypt$N$r$p$salt$hash (scrypt, 64-byte
- * key). The plaintext password is never stored or logged.
+ * environment variables. Format: scrypt:N:r:p:<salt hex>:<hash hex>
+ * (scrypt, 64-byte key; colon-separated on purpose — "$" separators would
+ * be expanded away by dotenv-based env loaders). The plaintext password is
+ * never stored or logged.
  */
 import { randomBytes, scryptSync } from "node:crypto";
 import { createInterface } from "node:readline/promises";

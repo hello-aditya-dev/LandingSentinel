@@ -157,6 +157,7 @@ const SCAN_VARS = [
   "SCAN_MAX_REDIRECTS",
   "SCAN_MAX_BODY_BYTES",
   "SCAN_SLOW_RESPONSE_MS",
+  "SCAN_MAX_DURATION_MS",
 ];
 const bad = [];
 let setCount = 0;

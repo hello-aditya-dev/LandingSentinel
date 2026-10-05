@@ -33,6 +33,12 @@ That is all most agencies need. Everything else on this page is optional.
 database per workspace and take effect immediately. This is the recommended
 path.
 
+With the default access-control mode (`APP_ACCESS_MODE=auth`, see
+SECURITY.md), editing your real workspace's branding requires administrator
+sign-in — the branding routes operate on the primary workspace and are
+guarded like every other real-data route. The demo playground below stays
+public.
+
 The settings view is scope-aware:
 
 - **App scope** (`/app/settings`) edits the branding of the workspace your
