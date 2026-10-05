@@ -407,7 +407,7 @@ export function HomeView() {
               </dl>
               <div className="mt-5 border border-hairline bg-paper-raised px-4 py-4">
                 <MicroLabel>SOURCE PACKAGE LAYOUT</MicroLabel>
-                <pre className="mt-2 overflow-x-auto font-mono text-[11.5px] leading-relaxed text-ink-2">{`landing-sentinel/
+                <pre className="mt-2 overflow-x-auto font-mono text-[11.5px] leading-relaxed text-ink-2">{`LandingSentinel/
 ├── src/            app, components, lib, scanner
 ├── prisma/         schema + migrations
 ├── sample-data/    synthetic CSV fixtures
