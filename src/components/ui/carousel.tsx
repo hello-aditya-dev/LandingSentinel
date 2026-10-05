@@ -95,11 +95,16 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
-    onSelect(api)
+    // Initial state sync deferred to after paint (avoids the
+    // setState-synchronously-in-effect pattern flagged by react-hooks v7).
+    const sync = () => onSelect(api)
+    const raf = requestAnimationFrame(sync)
     api.on("reInit", onSelect)
     api.on("select", onSelect)
 
     return () => {
+      cancelAnimationFrame(raf)
+      api?.off("reInit", onSelect)
       api?.off("select", onSelect)
     }
   }, [api, onSelect])
