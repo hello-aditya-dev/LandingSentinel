@@ -40,8 +40,6 @@
     "node_modules",
     "examples",
     "skills",
-    "tests",
-    "download",
-    "scripts"
+    "download"
   ]
 }

@@ -889,4 +889,112 @@ export function preflightStatus(findings: { severity: Severity }[]): "DO_NOT_LAU
   return "LAUNCH_READY";
 }
 
+/* -------------------------------------------------------------- */
+/* Scan-level aggregation (deterministic, pure)                    */
+/* -------------------------------------------------------------- */
+
+export type ScanTargetStatsInput = {
+  /** Spend associated with the destination (minor units). */
+  associatedSpendMinor: number;
+  findings: { severity: string }[];
+};
+
+export type ScanAggregates = {
+  criticalFindings: number;
+  warningFindings: number;
+  infoFindings: number;
+  criticalDestinations: number;
+  warningDestinations: number;
+  healthyDestinations: number;
+  criticalSpendMinor: number;
+  warningSpendMinor: number;
+  healthySpendMinor: number;
+  readinessScore: number;
+  preflightStatus: "DO_NOT_LAUNCH" | "REVIEW_BEFORE_LAUNCH" | "LAUNCH_READY";
+};
+
+/**
+ * Scan-level aggregates.
+ *
+ * Spend exposure is computed at the unique-destination level with
+ * critical > warning > healthy precedence — a destination with three
+ * critical findings contributes its spend ONCE to critical spend,
+ * never three times.
+ *
+ * Readiness is the spend-weighted mean of per-destination scores
+ * (equal weights when there is no spend). The preflight STATUS takes
+ * precedence over the score: any confirmed critical finding produces
+ * DO_NOT_LAUNCH regardless of how high the numerical score is.
+ */
+export function aggregateScanStats(targets: ScanTargetStatsInput[]): ScanAggregates {
+  let criticalFindings = 0,
+    warningFindings = 0,
+    infoFindings = 0,
+    criticalDestinations = 0,
+    warningDestinations = 0,
+    healthyDestinations = 0,
+    criticalSpendMinor = 0,
+    warningSpendMinor = 0,
+    healthySpendMinor = 0;
+
+  const destinationScores: { score: number; spend: number }[] = [];
+
+  for (const target of targets) {
+    const critical = target.findings.filter((f) => f.severity === "critical");
+    const warnings = target.findings.filter((f) => f.severity === "warning");
+    const infos = target.findings.filter((f) => f.severity === "info");
+
+    criticalFindings += critical.length;
+    warningFindings += warnings.length;
+    infoFindings += infos.length;
+
+    destinationScores.push({
+      score: destinationScore(target.findings.map((f) => ({ severity: f.severity as Severity }))),
+      spend: target.associatedSpendMinor,
+    });
+
+    if (critical.length > 0) {
+      criticalDestinations += 1;
+      criticalSpendMinor += target.associatedSpendMinor;
+    } else if (warnings.length > 0) {
+      warningDestinations += 1;
+      warningSpendMinor += target.associatedSpendMinor;
+    } else {
+      healthyDestinations += 1;
+      healthySpendMinor += target.associatedSpendMinor;
+    }
+  }
+
+  // Spend-weighted readiness score (equal weights when there is no spend).
+  let readinessScore: number;
+  const totalWeighted = destinationScores.reduce((s, d) => s + d.spend, 0);
+  if (totalWeighted > 0) {
+    readinessScore = Math.round(
+      destinationScores.reduce((s, d) => s + d.score * d.spend, 0) / totalWeighted
+    );
+  } else {
+    readinessScore = Math.round(
+      destinationScores.reduce((s, d) => s + d.score, 0) / Math.max(1, destinationScores.length)
+    );
+  }
+
+  const allSeverities = targets.flatMap((t) =>
+    t.findings.map((f) => ({ severity: f.severity as Severity }))
+  );
+
+  return {
+    criticalFindings,
+    warningFindings,
+    infoFindings,
+    criticalDestinations,
+    warningDestinations,
+    healthyDestinations,
+    criticalSpendMinor,
+    warningSpendMinor,
+    healthySpendMinor,
+    readinessScore,
+    preflightStatus: preflightStatus(allSeverities),
+  };
+}
+
 export type { Confidence, FindingDraft };

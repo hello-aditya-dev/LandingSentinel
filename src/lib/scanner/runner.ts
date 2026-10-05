@@ -3,6 +3,14 @@
  * concurrency pool, persists results incrementally (so polling shows real
  * progress), and computes deterministic aggregates.
  *
+ * EXECUTION MODEL (see ARCHITECTURE.md / DEPLOYMENT.md):
+ * The whole scan — up to SCAN_MAX_TARGETS destinations — executes INSIDE the
+ * API request that started it. There is no detached background work: on a
+ * serverless host (Vercel) the scan lives and dies with the request, which
+ * is why SCAN_MAX_DURATION_MS bounds the run and fits the route's declared
+ * maxDuration. Progress is observable by polling GET /api/scans/[id] during
+ * the request because each target's state is persisted as it completes.
+ *
  * A failed target fails safely — the scan completes as "partial", never
  * taking the whole run down. One conservative retry is made for transient
  * network conditions only (never for blocked URLs, 404s, or invalid URLs).
@@ -12,18 +20,11 @@ import { db } from "@/lib/db";
 import { PRODUCT } from "@/config/product";
 import { serverLog } from "@/lib/api/envelope";
 import { fetchPage } from "./fetch-page";
-import { runChecks, destinationScore, preflightStatus } from "./findings";
+import { runChecks, aggregateScanStats } from "./findings";
 import { fixtureFetch, DEMO_DESTINATIONS, type DemoDestination } from "./demo-fixtures";
 import { canonicalPlatform } from "./tracking";
 import type { FindingDraft, PageFetchResult, ScanContext } from "./types";
 import type { WorkspaceContext } from "@/lib/services/context";
-
-/** In-process runner registry (dev server / long-running Node). */
-const activeRuns = new Map<string, Promise<void>>();
-
-export function isScanRunning(scanId: string): boolean {
-  return activeRuns.has(scanId);
-}
 
 export type StartScanInput = {
   ctx: WorkspaceContext;
@@ -35,12 +36,19 @@ export type StartScanInput = {
   fixtureDelays?: boolean;
 };
 
+export type ScanRunResult = {
+  scanId: string;
+  state: "complete" | "partial" | "failed";
+};
+
 /**
  * Create a scan with queued targets covering the workspace destinations
- * (spend-ranked, capped at SCAN_MAX_TARGETS) and start the runner.
- * Returns the scan id immediately; progress is observable via polling.
+ * (spend-ranked, capped at SCAN_MAX_TARGETS) and run it TO COMPLETION inside
+ * this call. Resolves when every target has been scanned and the scan-level
+ * aggregates have been persisted — the HTTP response for the request that
+ * started the scan is only sent after the scan is done.
  */
-export async function startScan(input: StartScanInput): Promise<string> {
+export async function executeScan(input: StartScanInput): Promise<ScanRunResult> {
   const { ctx } = input;
 
   // Aggregate destinations with their campaign rows (spend + platforms).
@@ -66,7 +74,6 @@ export async function startScan(input: StartScanInput): Promise<string> {
     .sort((a, b) => b.spendMinor - a.spendMinor || a.destination.normalizedKey.localeCompare(b.destination.normalizedKey));
 
   const selected = ranked.slice(0, PRODUCT.scanner.maxTargets);
-  const totalSpendMinor = ranked.reduce((sum, r) => sum + r.spendMinor, 0);
   const scanCurrency = selected[0]?.destination.campaignLinks[0]?.campaignRow.currency ?? "GBP";
 
   const scan = await db.scan.create({
@@ -97,25 +104,32 @@ export async function startScan(input: StartScanInput): Promise<string> {
 
   await db.scan.update({ where: { id: scan.id }, data: { state: "running", startedAt: new Date() } });
 
-  const run = runScanTargets(scan.id, ctx, input.variant ?? "live", input.fixtureDelays ?? true)
-    .catch(async (err) => {
-      serverLog("error", "scan_runner_failed", {
-        scanId: scan.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      await db.scan
-        .update({
-          where: { id: scan.id },
-          data: { state: "failed", completedAt: new Date() },
-        })
-        .catch(() => undefined);
-    })
-    .finally(() => {
-      activeRuns.delete(scan.id);
+  // The scan runs INSIDE this request — no detached promise. Any unexpected
+  // failure marks the scan failed (best effort) and surfaces to the route.
+  try {
+    await runScanTargets(scan.id, ctx, input.variant ?? "live", input.fixtureDelays ?? true);
+  } catch (err) {
+    serverLog("error", "scan_runner_failed", {
+      scanId: scan.id,
+      error: err instanceof Error ? err.message : String(err),
     });
+    await db.scan
+      .update({
+        where: { id: scan.id },
+        data: { state: "failed", completedAt: new Date() },
+      })
+      .catch(() => undefined);
+    return { scanId: scan.id, state: "failed" };
+  }
 
-  activeRuns.set(scan.id, run);
-  return scan.id;
+  const final = await db.scan.findUnique({
+    where: { id: scan.id },
+    select: { state: true },
+  });
+  return {
+    scanId: scan.id,
+    state: (final?.state as ScanRunResult["state"]) ?? "failed",
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -137,6 +151,10 @@ export async function runScanTargets(
   });
 
   const concurrency = ctx.scanEngine === "demo-fixture" ? 3 : PRODUCT.scanner.concurrency;
+  // Whole-scan deadline: targets not reached in time are marked failed with
+  // SCAN_WINDOW_EXCEEDED instead of silently missing, and the scan finishes
+  // as "partial". This keeps the in-request scan inside serverless limits.
+  const deadline = Date.now() + PRODUCT.scanner.maxScanDurationMs;
   let cursor = 0;
   let failures = 0;
 
@@ -145,6 +163,24 @@ export async function runScanTargets(
       const index = cursor++;
       if (index >= targets.length) return;
       const target = targets[index];
+      if (Date.now() > deadline) {
+        failures += 1;
+        await db.scanTarget
+          .update({
+            where: { id: target.id },
+            data: {
+              state: "failed",
+              stage: null,
+              completedAt: new Date(),
+              error: {
+                code: "SCAN_WINDOW_EXCEEDED",
+                message: `The scan window (SCAN_MAX_DURATION_MS=${PRODUCT.scanner.maxScanDurationMs}) closed before this destination was reached. Raise the limit together with your host's function timeout, or lower SCAN_MAX_TARGETS.`,
+              },
+            },
+          })
+          .catch(() => undefined);
+        continue;
+      }
       try {
         await scanOneTarget(scanId, target, ctx, variant, fixtureDelays, scanIndex);
       } catch (err) {
@@ -384,59 +420,12 @@ async function finalizeScan(scanId: string, failedTargets: number, totalTargets:
 
   // Aggregates — spend exposure computed at unique destination level with
   // critical > warning > healthy precedence (no double counting).
-  let criticalFindings = 0,
-    warningFindings = 0,
-    infoFindings = 0,
-    criticalDestinations = 0,
-    warningDestinations = 0,
-    healthyDestinations = 0,
-    criticalSpendMinor = 0,
-    warningSpendMinor = 0,
-    healthySpendMinor = 0;
-
-  const destinationScores: { score: number; spend: number }[] = [];
-
-  for (const target of targets) {
-    const critical = target.findings.filter((f) => f.severity === "critical");
-    const warnings = target.findings.filter((f) => f.severity === "warning");
-    const infos = target.findings.filter((f) => f.severity === "info");
-
-    criticalFindings += critical.length;
-    warningFindings += warnings.length;
-    infoFindings += infos.length;
-
-    destinationScores.push({
-      score: destinationScore(target.findings.map((f) => ({ severity: f.severity as "critical" | "warning" | "info" }))),
-      spend: target.associatedSpendMinor,
-    });
-
-    if (critical.length > 0) {
-      criticalDestinations += 1;
-      criticalSpendMinor += target.associatedSpendMinor;
-    } else if (warnings.length > 0) {
-      warningDestinations += 1;
-      warningSpendMinor += target.associatedSpendMinor;
-    } else {
-      healthyDestinations += 1;
-      healthySpendMinor += target.associatedSpendMinor;
-    }
-  }
-
-  // Spend-weighted readiness score (equal weights when there is no spend).
-  let readinessScore: number;
-  const totalWeighted = destinationScores.reduce((s, d) => s + d.spend, 0);
-  if (totalWeighted > 0) {
-    readinessScore = Math.round(
-      destinationScores.reduce((s, d) => s + d.score * d.spend, 0) / totalWeighted
-    );
-  } else {
-    readinessScore = Math.round(
-      destinationScores.reduce((s, d) => s + d.score, 0) / Math.max(1, destinationScores.length)
-    );
-  }
-
-  const allSeverities = targets.flatMap((t) => t.findings.map((f) => f.severity as "critical" | "warning" | "info"));
-  const status = preflightStatus(allSeverities.map((severity) => ({ severity })));
+  const aggregates = aggregateScanStats(
+    targets.map((t) => ({
+      associatedSpendMinor: t.associatedSpendMinor,
+      findings: t.findings.map((f) => ({ severity: f.severity })),
+    }))
+  );
 
   const state = failedTargets > 0 ? "partial" : "complete";
 
@@ -445,18 +434,18 @@ async function finalizeScan(scanId: string, failedTargets: number, totalTargets:
     data: {
       state,
       completedAt: new Date(),
-      readinessScore,
-      preflightStatus: status,
+      readinessScore: aggregates.readinessScore,
+      preflightStatus: aggregates.preflightStatus,
       stats: {
-        criticalFindings,
-        warningFindings,
-        infoFindings,
-        criticalDestinations,
-        warningDestinations,
-        healthyDestinations,
-        criticalSpendMinor,
-        warningSpendMinor,
-        healthySpendMinor,
+        criticalFindings: aggregates.criticalFindings,
+        warningFindings: aggregates.warningFindings,
+        infoFindings: aggregates.infoFindings,
+        criticalDestinations: aggregates.criticalDestinations,
+        warningDestinations: aggregates.warningDestinations,
+        healthyDestinations: aggregates.healthyDestinations,
+        criticalSpendMinor: aggregates.criticalSpendMinor,
+        warningSpendMinor: aggregates.warningSpendMinor,
+        healthySpendMinor: aggregates.healthySpendMinor,
         failedTargets,
         totalTargets,
       },
@@ -466,10 +455,10 @@ async function finalizeScan(scanId: string, failedTargets: number, totalTargets:
   serverLog("info", "scan_complete", {
     scanId,
     state,
-    status,
-    readinessScore,
-    criticalFindings,
-    warningFindings,
+    status: aggregates.preflightStatus,
+    readinessScore: aggregates.readinessScore,
+    criticalFindings: aggregates.criticalFindings,
+    warningFindings: aggregates.warningFindings,
     destinations: totalTargets,
   });
 }

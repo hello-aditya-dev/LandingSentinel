@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ok, fail, route } from "@/lib/api/envelope";
 import { resolveContext } from "@/lib/services/context";
 import { commitImport } from "@/lib/services/import";
+import { requireAdminFor } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,8 @@ export const POST = route(async (req) => {
   }
 
   const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
   const result = await commitImport(ctx, {
     filename: parsedBody.data.filename,
     csvText: parsedBody.data.csvText,

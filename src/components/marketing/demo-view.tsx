@@ -54,7 +54,7 @@ export function DemoView() {
       {
         onSuccess: ({ scanId }) => {
           setVariant("live");
-          toast({ title: "Demo scan started", description: "Synthetic destinations are being inspected — watch the progress panel." });
+          toast({ title: "Demo scan complete", description: "Every synthetic destination was inspected — the results are below." });
           navigate({ view: "demo" });
           void scanId;
         },

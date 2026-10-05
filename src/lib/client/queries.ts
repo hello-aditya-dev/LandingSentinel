@@ -135,6 +135,64 @@ export function useScanList(scope: "demo" | "app") {
   return useQuery({
     queryKey: ["scans", scope],
     queryFn: () => api<{ scans: ScanSummary[] }>(withScope("/api/scans", scope)),
+    // While a scan is running inside its request, its persisted state changes
+    // target by target — poll so running scans surface themselves, and poll
+    // briefly after each fetch so a scan created moments ago (POST in-flight)
+    // appears without user action.
+    refetchInterval: (query) => {
+      const scans = query.state.data?.scans;
+      if (!scans) return false;
+      const anyActive = scans.some((s) => s.state === "running" || s.state === "pending");
+      if (anyActive) return 1200;
+      if (Date.now() - query.state.dataUpdatedAt < 15_000) return 1500;
+      return false;
+    },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Access control                                                      */
+/* ------------------------------------------------------------------ */
+
+export type SessionData = {
+  authRequired: boolean;
+  authenticated: boolean;
+  passwordConfigured: boolean;
+  mode: "auth" | "open";
+};
+
+export function useSession(scope: "demo" | "app") {
+  return useQuery({
+    queryKey: ["session", scope],
+    queryFn: () => api<SessionData>(withScope("/api/auth/session", scope)),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useLogin(scope: "demo" | "app") {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { password: string }) =>
+      api<{ authenticated: boolean }>(withScope("/api/auth/login", scope), {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session", scope] });
+      queryClient.invalidateQueries(); // every workspace query was 401'd
+    },
+  });
+}
+
+export function useLogout(scope: "demo" | "app") {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ authenticated: boolean }>("/api/auth/logout", { method: "POST" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["session", scope] });
+      queryClient.invalidateQueries();
+    },
   });
 }
 

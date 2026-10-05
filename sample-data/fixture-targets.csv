@@ -1,0 +1,15 @@
+Destination URL,Campaign,Ad Group,Spend,Platform,Currency
+http://127.0.0.1:4010/healthy?utm_source=google&utm_medium=cpc&gclid=EAIaIQobChMI.demo1,Summer Sale,Shoes,2510.40,google,GBP
+http://127.0.0.1:4010/redirect-healthy?utm_source=google&utm_medium=cpc,Summer Sale,Boots,940.00,google,GBP
+http://127.0.0.1:4010/redirect-relative?utm_source=meta&utm_medium=paid_social,Retargeting,Shoes,610.25,meta,GBP
+http://127.0.0.1:4010/redirect-utm-preserve?utm_source=google&utm_campaign=sale&gclid=EAIaIQobChMI.demo2,Summer Sale,Sandals,880.10,google,GBP
+http://127.0.0.1:4010/redirect-utm-drop?utm_source=meta&utm_campaign=launch&fbclid=IwARdemo,Launch,All,1500.00,meta,GBP
+http://127.0.0.1:4010/not-found?utm_source=google&utm_medium=cpc,Summer Sale,Bags,312.75,google,GBP
+http://127.0.0.1:4010/server-error?utm_source=meta,Retargeting,All,275.50,meta,GBP
+http://127.0.0.1:4010/slow?utm_source=google,Always-on,All,430.00,google,GBP
+http://127.0.0.1:4010/redirect-loop?utm_source=meta,Retargeting,Shoes,198.20,meta,GBP
+http://127.0.0.1:4010/trackers?utm_source=meta&utm_medium=paid_social,Retargeting,Boots,1205.60,meta,GBP
+http://127.0.0.1:4010/no-trackers?utm_source=meta&utm_medium=paid_social,Retargeting,Sandals,760.35,meta,GBP
+http://127.0.0.1:4010/soft-404?utm_source=google,Summer Sale,Accessories,540.90,google,GBP
+http://127.0.0.1:4010/noindex?utm_source=google,Always-on,All,415.00,google,GBP
+http://127.0.0.1:4010/redirect-unsafe?utm_source=meta,Launch,All,222.00,meta,GBP

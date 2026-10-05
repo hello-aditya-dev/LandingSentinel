@@ -3,6 +3,7 @@ import { ok, fail, route } from "@/lib/api/envelope";
 import { resolveContext } from "@/lib/services/context";
 import { generateReport } from "@/lib/services/queries";
 import { db } from "@/lib/db";
+import { requireAdminFor } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -15,6 +16,8 @@ export const GET = route(async (req) => {
   const url = new URL(req.url);
   const scope = url.searchParams.get("scope") === "demo" ? "demo" : "app";
   const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
   const reports = await db.report.findMany({
     where: { scan: { workspaceId: ctx.workspaceId } },
     orderBy: { generatedAt: "desc" },
@@ -58,6 +61,8 @@ export const POST = route(async (req) => {
     return fail("INVALID_INPUT", "The report request is not valid.", 400);
   }
   const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
   const report = await generateReport(parsed.data.scanId, ctx, parsed.data.title);
   if (!report) {
     return fail("NOT_FOUND", "No completed scan was found for this report.", 404);

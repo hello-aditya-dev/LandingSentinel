@@ -25,6 +25,9 @@ export type ApiErrorCode =
   | "NOT_FOUND"
   | "RATE_LIMITED"
   | "PERSISTENCE_FAILURE"
+  | "AUTH_REQUIRED"
+  | "AUTH_CONFIG_MISSING"
+  | "AUTH_INVALID_CREDENTIALS"
   | "SERVER_FAILURE";
 
 export class ApiError extends Error {

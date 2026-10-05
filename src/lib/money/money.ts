@@ -104,11 +104,16 @@ export function parseMoneyToMinor(
       wholePart = text.slice(0, lastComma);
       fracPart = tail;
     } else {
-      // Thousands separators: every group must be 3 digits.
+      // Thousands separators: every group must be 3 digits, except the
+      // FIRST group (1–3 digits), so "1,700" and "12,345" are valid while
+      // "1,23,456" and "12,34" are not.
       const groups = text.split(",");
       wholePart = groups.join("");
       fracPart = "";
-      if (groups.some((g) => g.length !== 3) || !/^\d+$/.test(wholePart)) {
+      const malformedGroup = groups.some((g, i) =>
+        i === 0 ? g.length < 1 || g.length > 3 : g.length !== 3
+      );
+      if (malformedGroup || !/^\d+$/.test(wholePart)) {
         return { ok: false, reason: "Malformed thousands grouping" };
       }
     }

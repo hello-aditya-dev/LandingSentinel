@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ok, fail, route } from "@/lib/api/envelope";
 import { resolveContext, resolveBranding, ensureBrandingRow } from "@/lib/services/context";
+import { requireAdminFor } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,8 @@ export const GET = route(async (req) => {
   const url = new URL(req.url);
   const scope = url.searchParams.get("scope") === "demo" ? "demo" : "app";
   const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
   const branding = await resolveBranding(ctx.workspaceId);
   return ok({ branding, scope: ctx.scope });
 });
@@ -30,6 +33,8 @@ export const PUT = route(async (req) => {
   const url = new URL(req.url);
   const scope = url.searchParams.get("scope") === "demo" ? "demo" : "app";
   const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
 
   const body = await req.json().catch(() => null);
   const parsed = brandingSchema.safeParse(body);

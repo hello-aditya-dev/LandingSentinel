@@ -37,6 +37,15 @@ export const PRODUCT = {
   demoMode: boolEnv("DEMO_MODE", false),
   publicScannerEnabled: boolEnv("PUBLIC_SCANNER_ENABLED", false),
 
+  // Single-admin access control (see SECURITY.md).
+  // "auth" (default): real-workspace routes require an admin session.
+  // "open": no auth — documented escape hatch for private/trusted networks.
+  access: {
+    mode: (process.env.APP_ACCESS_MODE || "auth") === "open" ? ("open" as const) : ("auth" as const),
+    adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || "",
+    sessionTtlMs: intEnv("ADMIN_SESSION_TTL_HOURS", 24 * 7) * 60 * 60 * 1000,
+  },
+
   // Scanner limits (see CONFIGURATION.md)
   scanner: {
     maxTargets: intEnv("SCAN_MAX_TARGETS", 25),
@@ -46,6 +55,9 @@ export const PRODUCT = {
     maxBodyBytes: intEnv("SCAN_MAX_BODY_BYTES", 2 * 1024 * 1024),
     maxImportRows: 5_000,
     slowResponseMs: intEnv("SCAN_SLOW_RESPONSE_MS", 3_000),
+    /** Whole-scan deadline. Keeps the in-request scan inside serverless
+     *  function limits (Vercel default maxDuration 60s). */
+    maxScanDurationMs: intEnv("SCAN_MAX_DURATION_MS", 55_000),
     userAgent: "LandingSentinel/0.1 (+landing-page-integrity-check)",
   },
 } as const;

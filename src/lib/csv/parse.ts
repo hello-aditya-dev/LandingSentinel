@@ -159,9 +159,17 @@ export type ValidRow = {
 export type RejectedRow = {
   index: number;
   reason: string;
-  code: "INVALID_URL" | "UNSUPPORTED_PROTOCOL" | "INVALID_SPEND" | "NEGATIVE_SPEND" | "INVALID_CURRENCY" | "DUPLICATE_ROW" | "EMPTY_ROW";
+  code: "INVALID_URL" | "UNSUPPORTED_PROTOCOL" | "INVALID_SPEND" | "NEGATIVE_SPEND" | "SPEND_TOO_LARGE" | "INVALID_CURRENCY" | "DUPLICATE_ROW" | "EMPTY_ROW";
   raw: Record<string, string>;
 };
+
+/**
+ * Per-row spend ceiling: 32-bit signed integer minor units (PostgreSQL
+ * integer). £21,474,836.47 in a single campaign row is far beyond real
+ * paid-media exports; the boundary is documented in CONFIGURATION.md and
+ * rejected gracefully (surfaced for review) rather than failing the import.
+ */
+export const MAX_SPEND_MINOR_PER_ROW = 2_147_483_647;
 
 export type ValidationSummary = {
   valid: ValidRow[];
@@ -212,6 +220,15 @@ export function validateRows(rows: Record<string, string>[], mapping: Mapping): 
     }
     if (spend.minor < 0) {
       rejected.push({ index, code: "NEGATIVE_SPEND", reason: "Spend is negative", raw: row });
+      return;
+    }
+    if (spend.minor > MAX_SPEND_MINOR_PER_ROW) {
+      rejected.push({
+        index,
+        code: "SPEND_TOO_LARGE",
+        reason: "Spend exceeds the per-row maximum of 2,147,483,647 minor units (£21,474,836.47) — the 32-bit storage boundary",
+        raw: row,
+      });
       return;
     }
 

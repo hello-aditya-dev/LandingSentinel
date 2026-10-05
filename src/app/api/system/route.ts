@@ -1,6 +1,7 @@
 import { ok, route, serverLog } from "@/lib/api/envelope";
 import { PRODUCT } from "@/config/product";
 import { db } from "@/lib/db";
+import { authModeActive, isPasswordHashConfigured } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -56,6 +57,23 @@ async function runChecks(): Promise<Check[]> {
       : "Disabled (recommended)",
   });
 
+  // Access control
+  if (authModeActive()) {
+    checks.push({
+      name: "Access control",
+      status: isPasswordHashConfigured() ? "ok" : "fail",
+      detail: isPasswordHashConfigured()
+        ? "Admin authentication active (APP_ACCESS_MODE=auth)"
+        : "APP_ACCESS_MODE=auth but ADMIN_PASSWORD_HASH is not set — the real workspace is locked. Generate a hash with: npm run hash-password",
+    });
+  } else {
+    checks.push({
+      name: "Access control",
+      status: "warn",
+      detail: "Disabled (APP_ACCESS_MODE=open) — real-workspace routes are unauthenticated. Only acceptable on trusted/private networks.",
+    });
+  }
+
   // Environment
   checks.push({
     name: "Environment",
@@ -74,6 +92,7 @@ export const GET = route(async () => {
     productName: PRODUCT.name,
     demoMode: PRODUCT.demoMode,
     publicScannerEnabled: PRODUCT.publicScannerEnabled,
+    accessMode: PRODUCT.access.mode,
     nodeVersion: process.versions.node,
     environment: process.env.NODE_ENV === "production" ? "Production" : "Development",
     scanner: {

@@ -1,11 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Standard output. `next build` fails on TypeScript errors (by design —
+  // `npm run qa` and the build gate share the same type contract).
   reactStrictMode: false,
 };
 

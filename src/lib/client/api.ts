@@ -30,6 +30,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const envelope = json as { ok: boolean; data?: T; error?: { code: string; message: string; details?: Record<string, unknown> } };
   if (!envelope.ok || envelope.error) {
+    // Session expiry mid-view: notify the shell so it can show the login
+    // screen instead of scattering error toasts across every view.
+    if (envelope.error?.code === "AUTH_REQUIRED" && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("landingsentinel:auth-required"));
+    }
     throw new ApiClientError(
       envelope.error?.code ?? "SERVER_FAILURE",
       envelope.error?.message ?? "The server could not complete this request.",

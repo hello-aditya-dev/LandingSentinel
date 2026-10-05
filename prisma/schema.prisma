@@ -1,16 +1,18 @@
 // LandingSentinel — data model
+//
+// PostgreSQL is the canonical production database (see DEPLOYMENT.md).
+// Set DATABASE_URL to any PostgreSQL connection string (Neon, Supabase,
+// RDS, self-hosted) and run `npm run db:migrate` — no provider edits needed.
+//
 // Money is stored as integer minor units (e.g. pence) with a separate ISO
 // currency code. Never use floating point for financial values.
-// SQLite is used for the bundled development/demo deployment; the schema is
-// provider-portable (switch `provider` to "postgresql" with a matching
-// DATABASE_URL for production — see DEPLOYMENT.md).
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -179,7 +181,7 @@ model ScanTarget {
   completedAt          DateTime?
 
   scan        Scan         @relation(fields: [scanId], references: [id], onDelete: Cascade)
-  destination Destination  @relation(fields: [destinationId], references: [id])
+  destination Destination  @relation(fields: [destinationId], references: [id], onDelete: Cascade)
   redirects   RedirectHop[]
   findings    Finding[]
 
@@ -254,4 +256,14 @@ model ScanExpectation {
 
   @@unique([workspaceId, destinationKey])
   @@index([workspaceId])
+}
+
+// Single-admin access control (see SECURITY.md). The cookie carries an
+// opaque random token; this table stores only its SHA-256 hash.
+model AdminSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime?
+  expiresAt  DateTime
 }

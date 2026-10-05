@@ -1,6 +1,7 @@
 import { ok, fail, route } from "@/lib/api/envelope";
 import { resolveContext } from "@/lib/services/context";
 import { getScanDetail } from "@/lib/services/queries";
+import { requireAdminFor } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,8 @@ export const GET = route(async (req, { params }: { params: Promise<{ id: string 
   const url = new URL(req.url);
   const scope = url.searchParams.get("scope") === "demo" ? "demo" : "app";
   const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
   const detail = await getScanDetail(id, ctx);
   if (!detail) {
     return fail("NOT_FOUND", "This scan does not exist in this workspace.", 404);

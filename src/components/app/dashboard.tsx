@@ -5,6 +5,7 @@
  * scan, import history. Empty states are designed, not accidental.
  */
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useDashboard, useStartScan } from "@/lib/client/queries";
 import { useRouter } from "@/store/router";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
@@ -19,6 +20,7 @@ export function DashboardView({ scope }: { scope: "demo" | "app" }) {
   const { data, isLoading, isError, error } = useDashboard(scope);
   const navigate = useRouter((s) => s.navigate);
   const startScan = useStartScan(scope);
+  const queryClient = useQueryClient();
 
   if (isError) {
     return (
@@ -46,14 +48,18 @@ export function DashboardView({ scope }: { scope: "demo" | "app" }) {
       });
       return;
     }
+    // The scan runs inside the request — surface it immediately in the
+    // scans list, where its persisted state is polled live.
+    queryClient.invalidateQueries({ queryKey: ["scans", scope] });
+    navigate({ view: "scans" });
     startScan.mutate(
       { label: scope === "demo" ? "Demo scan" : "Preflight scan" },
       {
         onSuccess: ({ scanId }) => {
-          toast({ title: "Scan started", description: "The scanner is checking each destination now." });
+          toast({ title: "Scan complete", description: "Every destination was inspected — the results are ready." });
           navigate({ view: "scan", scanId });
         },
-        onError: (err) => toast({ title: "The scan could not start", description: err instanceof Error ? err.message : undefined }),
+        onError: (err) => toast({ title: "The scan could not run", description: err instanceof Error ? err.message : undefined }),
       }
     );
   };

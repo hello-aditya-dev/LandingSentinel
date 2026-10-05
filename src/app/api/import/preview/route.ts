@@ -2,6 +2,8 @@ import { z } from "zod";
 import { ok, fail, route } from "@/lib/api/envelope";
 import { parseCsvText, detectMapping, validateRows } from "@/lib/csv/parse";
 import { PRODUCT } from "@/config/product";
+import { resolveContext } from "@/lib/services/context";
+import { requireAdminFor } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -16,6 +18,12 @@ const previewSchema = z.object({
  * re-validates server-side regardless (never trust client validation).
  */
 export const POST = route(async (req) => {
+  const url = new URL(req.url);
+  const scope = url.searchParams.get("scope") === "demo" ? "demo" : "app";
+  const ctx = await resolveContext(scope);
+  const denied = await requireAdminFor(ctx, req);
+  if (denied) return denied;
+
   const body = await req.json().catch(() => null);
   const parsed = previewSchema.safeParse(body);
   if (!parsed.success) {

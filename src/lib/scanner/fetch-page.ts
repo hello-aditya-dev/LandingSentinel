@@ -250,22 +250,10 @@ export async function fetchPage(url: string, opts: FetchOptions = {}): Promise<P
       continue;
     }
 
-    if (hop === maxRedirects) {
-      // The loop guard above catches >maxRedirects hops before this line,
-      // but keep an explicit guard for clarity.
-      return {
-        kind: "error",
-        requestedUrl: url,
-        finalUrl: currentUrl,
-        errorCode: "TOO_MANY_REDIRECTS",
-        message: `The scanner stopped after ${maxRedirects} redirects.`,
-        responseTimeMs: Date.now() - startedAt,
-        redirects,
-        httpStatus: res.status,
-      };
-    }
-
     // 4. Non-redirect response: inspect content type, then read with a cap.
+    // (A chain of exactly maxRedirects redirects that ends in a normal
+    // response is a SUCCESS: the loop below allows maxRedirects+1 requests,
+    // so hop === maxRedirects here means the final hop was reachable.)
     finalUrl = normalizedCurrent;
     const contentType = res.headers.get("content-type");
     const responseHeaders: Record<string, string> = {};

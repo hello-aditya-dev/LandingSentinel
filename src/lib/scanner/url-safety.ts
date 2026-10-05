@@ -13,53 +13,112 @@
 
 import { lookup } from "node:dns/promises";
 import ipaddr from "ipaddr.js";
+import type { IPv4, IPv6 } from "ipaddr.js";
 
 export type UrlSafetyVerdict =
   | { safe: true; url: URL; resolvedIps: string[] }
   | { safe: false; code: "INVALID_URL" | "UNSUPPORTED_PROTOCOL" | "EMBEDDED_CREDENTIALS" | "BLOCKED_HOSTNAME" | "BLOCKED_IP_RANGE"; reason: string };
 
 /** Hostnames that are always internal, regardless of resolution. */
-const BLOCKED_HOSTNAME_PATTERNS: { pattern: RegExp; reason: string }[] = [
-  { pattern: /^localhost$/i, reason: "localhost is an internal address" },
-  { pattern: /\.localhost$/i, reason: "*.localhost is an internal address" },
+const BLOCKED_HOSTNAME_PATTERNS: { pattern: RegExp; reason: string; loopbackOnly?: boolean }[] = [
+  { pattern: /^localhost$/i, reason: "localhost is an internal address", loopbackOnly: true },
+  { pattern: /\.localhost$/i, reason: "*.localhost is an internal address", loopbackOnly: true },
   { pattern: /\.local$/i, reason: "*.local is an internal hostname" },
   { pattern: /\.internal$/i, reason: "*.internal is an internal hostname" },
   { pattern: /\.home\.arpa$/i, reason: "*.home.arpa is an internal hostname" },
   { pattern: /^metadata\.google\.internal$/i, reason: "cloud metadata endpoint" },
   { pattern: /^instance-data$/i, reason: "cloud metadata endpoint" },
   { pattern: /^metadata$/i, reason: "cloud metadata endpoint" },
-  { pattern: /^ip6-localhost$/i, reason: "internal hostname" },
+  { pattern: /^ip6-localhost$/i, reason: "internal hostname", loopbackOnly: true },
 ];
+
+/**
+ * Network rules. Bases are PARSED at module load: ipaddr.js `match()` only
+ * accepts parsed address objects — passing a raw string silently throws
+ * ("other.kind is not a function"), which historically disabled the entire
+ * range table. Parsing at load time makes a malformed rule fail loudly at
+ * startup instead of silently at request time.
+ */
+type CidrRule = {
+  base: string;
+  bits: number;
+  net: IPv4 | IPv6;
+  /** Loopback rules are relaxed ONLY by SCANNER_ALLOW_LOOPBACK_TARGETS. */
+  loopbackOnly?: boolean;
+};
+
+function buildRules(entries: [string, number, boolean?][], family: "ipv4" | "ipv6"): CidrRule[] {
+  // Parse via an arrow wrapper: extracting ipaddr.IPv4.parse directly would
+  // detach it from its class receiver (`this`) and crash.
+  const parse = (base: string): IPv4 | IPv6 =>
+    family === "ipv4" ? ipaddr.IPv4.parse(base) : ipaddr.IPv6.parse(base);
+  const rules: CidrRule[] = [];
+  for (const [base, bits, loopbackOnly] of entries) {
+    const net = parse(base);
+    if (net.kind() !== family) {
+      throw new Error(`url-safety rule ${base}/${bits} is not an ${family} network`);
+    }
+    rules.push({ base, bits, net, loopbackOnly });
+  }
+  return rules;
+}
 
 /** IPv4 networks that must never be requested. */
-const UNSAFE_IPV4_CIDRS: [string, number][] = [
-  ["0.0.0.0", 8], // "this network" / unspecified
-  ["10.0.0.0", 8], // RFC1918 private
-  ["100.64.0.0", 10], // CGNAT shared address space
-  ["127.0.0.0", 8], // loopback
-  ["169.254.0.0", 16], // link-local incl. cloud metadata 169.254.169.254
-  ["172.16.0.0", 12], // RFC1918 private
-  ["192.0.0.0", 24], // IETF protocol assignments
-  ["192.0.2.0", 24], // TEST-NET-1 (documentation)
-  ["192.168.0.0", 16], // RFC1918 private
-  ["198.18.0.0", 15], // benchmarking
-  ["198.51.100.0", 24], // TEST-NET-2
-  ["203.0.113.0", 24], // TEST-NET-3
-  ["224.0.0.0", 4], // multicast
-  ["240.0.0.0", 4], // reserved (incl. broadcast 255.255.255.255)
-];
+const UNSAFE_IPV4_RULES: CidrRule[] = buildRules(
+  [
+    ["0.0.0.0", 8], // "this network" / unspecified
+    ["10.0.0.0", 8], // RFC1918 private
+    ["100.64.0.0", 10], // CGNAT shared address space
+    ["127.0.0.0", 8, true], // loopback (relaxed only by the test/dev flag)
+    ["169.254.0.0", 16], // link-local incl. cloud metadata 169.254.169.254
+    ["172.16.0.0", 12], // RFC1918 private
+    ["192.0.0.0", 24], // IETF protocol assignments
+    ["192.0.2.0", 24], // TEST-NET-1 (documentation)
+    ["192.168.0.0", 16], // RFC1918 private
+    ["198.18.0.0", 15], // benchmarking
+    ["198.51.100.0", 24], // TEST-NET-2
+    ["203.0.113.0", 24], // TEST-NET-3
+    ["224.0.0.0", 4], // multicast
+    ["240.0.0.0", 4], // reserved (incl. broadcast 255.255.255.255)
+  ],
+  "ipv4"
+);
 
 /** IPv6 networks that must never be requested. */
-const UNSAFE_IPV6_CIDRS: [string, number][] = [
-  ["::", 128], // unspecified
-  ["::1", 128], // loopback
-  ["::ffff:0:0", 96], // IPv4-mapped — inner IPv4 is checked too
-  ["64:ff9b::", 96], // NAT64 — inner IPv4 is checked too
-  ["fc00::", 7], // unique local
-  ["fe80::", 10], // link-local
-  ["ff00::", 8], // multicast
-  ["2001:db8::", 32], // documentation
-];
+const UNSAFE_IPV6_RULES: CidrRule[] = buildRules(
+  [
+    ["::", 128], // unspecified
+    ["::1", 128, true], // loopback (relaxed only by the test/dev flag)
+    ["::ffff:0:0", 96], // IPv4-mapped — inner IPv4 is checked too
+    ["64:ff9b::", 96], // NAT64 — inner IPv4 is checked too
+    ["fc00::", 7], // unique local
+    ["fe80::", 10], // link-local
+    ["ff00::", 8], // multicast
+    ["2001:db8::", 32], // documentation
+  ],
+  "ipv6"
+);
+
+/**
+ * Loopback relaxation — TEST/DEVELOPMENT ONLY (SCANNER_ALLOW_LOOPBACK_TARGETS).
+ * Read from the environment at CALL TIME (not cached) so test suites can
+ * control it precisely, and so production can never inherit it accidentally
+ * from a stale build-time value. It relaxes ONLY the rules flagged
+ * `loopbackOnly`; every other rule — private ranges, cloud metadata,
+ * link-local, CGNAT — remains enforced when the flag is set.
+ */
+function loopbackAllowed(): boolean {
+  const raw = process.env.SCANNER_ALLOW_LOOPBACK_TARGETS;
+  return raw === "true" || raw === "1";
+}
+
+function loopbackOnlyEnabled(loopbackOnly: boolean | undefined): boolean {
+  return !(loopbackOnly && loopbackAllowed());
+}
+
+function ruleEnabled(rule: CidrRule): boolean {
+  return loopbackOnlyEnabled(rule.loopbackOnly);
+}
 
 function classifyIp(addr: string): { unsafe: boolean; reason?: string } {
   let parsed;
@@ -70,41 +129,36 @@ function classifyIp(addr: string): { unsafe: boolean; reason?: string } {
   }
 
   if (parsed.kind() === "ipv4") {
-    for (const [base, bits] of UNSAFE_IPV4_CIDRS) {
-      try {
-        if (parsed.match([base, bits])) {
-          return { unsafe: true, reason: `${addr} is inside ${base}/${bits}` };
-        }
-      } catch {
-        /* skip malformed rule (cannot happen with static table) */
+    for (const rule of UNSAFE_IPV4_RULES) {
+      if (!ruleEnabled(rule)) continue;
+      if (parsed.match(rule.net, rule.bits)) {
+        return { unsafe: true, reason: `${addr} is inside ${rule.base}/${rule.bits}` };
       }
     }
     return { unsafe: false };
   }
 
   // IPv6: check direct ranges, then unwrap IPv4-mapped / NAT64 addresses.
-  for (const [base, bits] of UNSAFE_IPV6_CIDRS) {
-    try {
-      if (parsed.match([base, bits])) {
-        // IPv4-mapped and NAT64 carry an IPv4 payload that we classify too.
-        if (base === "::ffff:0:0" || base === "64:ff9b::") {
-          try {
-            const inner = parsed.toIPv4Address();
-            const innerText = inner.toNormalizedString();
-            for (const [b4, bits4] of UNSAFE_IPV4_CIDRS) {
-              if (inner.match([b4, bits4])) {
-                return { unsafe: true, reason: `${addr} maps to ${innerText} inside ${b4}/${bits4}` };
-              }
+  for (const rule of UNSAFE_IPV6_RULES) {
+    if (!ruleEnabled(rule)) continue;
+    if (parsed.match(rule.net, rule.bits)) {
+      // IPv4-mapped and NAT64 carry an IPv4 payload that we classify too.
+      if (rule.base === "::ffff:0:0" || rule.base === "64:ff9b::") {
+        try {
+          const inner = parsed.toIPv4Address();
+          const innerText = inner.toNormalizedString();
+          for (const rule4 of UNSAFE_IPV4_RULES) {
+            if (!ruleEnabled(rule4)) continue;
+            if (inner.match(rule4.net, rule4.bits)) {
+              return { unsafe: true, reason: `${addr} maps to ${innerText} inside ${rule4.base}/${rule4.bits}` };
             }
-            return { unsafe: false };
-          } catch {
-            return { unsafe: true, reason: `${addr} is an unmappable mapped address` };
           }
+          return { unsafe: false };
+        } catch {
+          return { unsafe: true, reason: `${addr} is an unmappable mapped address` };
         }
-        return { unsafe: true, reason: `${addr} is inside ${base}/${bits}` };
       }
-    } catch {
-      /* skip */
+      return { unsafe: true, reason: `${addr} is inside ${rule.base}/${rule.bits}` };
     }
   }
   return { unsafe: false };
@@ -143,14 +197,21 @@ export function checkUrlStatic(rawUrl: string): UrlSafetyVerdict {
     };
   }
 
-  for (const { pattern, reason } of BLOCKED_HOSTNAME_PATTERNS) {
-    if (pattern.test(url.hostname)) {
+  const hostNoBrackets = url.hostname.replace(/^\[|\]$/g, "");
+
+  for (const { pattern, reason, loopbackOnly } of BLOCKED_HOSTNAME_PATTERNS) {
+    if (!loopbackOnlyEnabled(loopbackOnly)) continue;
+    if (pattern.test(url.hostname) || pattern.test(hostNoBrackets)) {
       return { safe: false, code: "BLOCKED_HOSTNAME", reason: `Blocked: ${reason}.` };
     }
   }
 
-  // Single-label hostnames (no dot) are internal in practice.
-  if (!url.hostname.includes(".") && !isIpLiteral(url.hostname)) {
+  // Single-label hostnames (no dot) are internal in practice. IP literals
+  // (including bracketed IPv6 forms) are exempt and classified by range.
+  // With the loopback test flag, the literal name "localhost" is exempt too —
+  // every OTHER single-label name stays blocked even in test mode.
+  const localhostExempt = loopbackAllowed() && hostNoBrackets.toLowerCase() === "localhost";
+  if (!hostNoBrackets.includes(".") && !isIpLiteral(hostNoBrackets) && !localhostExempt) {
     return {
       safe: false,
       code: "BLOCKED_HOSTNAME",
@@ -158,7 +219,6 @@ export function checkUrlStatic(rawUrl: string): UrlSafetyVerdict {
     };
   }
 
-  const hostNoBrackets = url.hostname.replace(/^\[|\]$/g, "");
   if (isIpLiteral(hostNoBrackets)) {
     const verdict = classifyIp(hostNoBrackets);
     if (verdict.unsafe) {
