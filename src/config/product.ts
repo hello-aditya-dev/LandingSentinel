@@ -22,8 +22,8 @@ function boolEnv(name: string, fallback: boolean): boolean {
 export const PRODUCT = {
   name: process.env.NEXT_PUBLIC_PRODUCT_NAME || "LandingSentinel",
   tagline: "Paid-media landing-page preflight",
-  version: "0.1.2",
-  releaseName: "Production Polish",
+  version: "0.1.3",
+  releaseName: "Production Routing & Reliability",
   price: "£349",
   priceLine: "One-time payment · Founding agency licence",
 
