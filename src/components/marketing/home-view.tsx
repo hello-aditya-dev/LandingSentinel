@@ -6,7 +6,7 @@
  * maps to real functionality. Sections answer buying objections in order.
  */
 
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { PRODUCT } from "@/config/product";
 import { MicroLabel, Sheet, DossierLine, MarginNote, RegMark } from "@/components/paper/paper";
 import { StatusStamp, SeverityBadge } from "@/components/paper/stamp";
@@ -34,7 +34,7 @@ const totalSpend = 84_260_00;
 const criticalSpend = 11_840_00;
 
 export function HomeView() {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   const heroFindings = [
     {

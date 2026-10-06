@@ -5,7 +5,7 @@
  */
 
 import { useScanList } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { StatusStamp } from "@/components/paper/stamp";
 import { Money } from "@/components/paper/evidence";
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 export function ScansListView({ scope }: { scope: "demo" | "app" }) {
   const { data, isLoading } = useScanList(scope);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   if (isLoading || !data) {
     return (

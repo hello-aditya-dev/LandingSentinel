@@ -11,7 +11,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { useRouter } from "@/store/router";
+import { useAppNavigate, type Route } from "@/lib/nav";
 import { PRODUCT } from "@/config/product";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { StatusStamp, SeverityBadge } from "@/components/paper/stamp";
@@ -97,7 +97,7 @@ function stampFor(result: EvaluationResult): "DO_NOT_LAUNCH" | "REVIEW_BEFORE_LA
 }
 
 export function ScanOneView() {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   const [url, setUrl] = useState("");
   const [platform, setPlatform] = useState("none");
   const [expectedTracker, setExpectedTracker] = useState("none");
@@ -288,7 +288,7 @@ export function ScanOneView() {
 
 /* ------------------------------------------------------------------ */
 
-function ResultCard({ result, navigate }: { result: EvaluationResult; navigate: ReturnType<typeof useRouter.getState>["navigate"] }) {
+function ResultCard({ result, navigate }: { result: EvaluationResult; navigate: (route: Route) => void }) {
   const f = result.fetch;
   const relevantTrackers = (result.trackers ?? []).filter((t) => t.relevant);
   const otherTrackers = (result.trackers ?? []).filter((t) => !t.relevant);

@@ -278,3 +278,34 @@ hardening (see CHANGELOG.md):
 6. **Per-row spend cap:** rows above 2,147,483,647 minor units (int4
    boundary) are rejected gracefully as `SPEND_TOO_LARGE` instead of
    failing the import or the database write.
+
+## Demo-session workspace lifecycle
+
+The public campaign demo (`/demo`) is session-isolated: middleware stamps an
+HttpOnly `ls_demo_sid` cookie, and each anonymous visitor gets a private
+synthetic workspace (`demo:s:{uuid}`) created and seeded inside one database
+transaction — one visitor can never observe another's demo state.
+
+Those anonymous workspaces do not accumulate forever:
+
+- Whenever a demo session workspace is created or accessed, stale demo
+  workspaces whose database `createdAt` is older than 24 hours are deleted
+  opportunistically (at most one sweep per process per hour).
+- The delete predicate matches only the `demo:s:` slug prefix — it can never
+  match the buyer's real (`primary`) workspace or any custom workspace slug.
+- Deletes cascade through the schema (findings, scans, campaign rows, and so
+  on) and are atomic; failures are swallowed and retried on a later access.
+- On serverless multi-instance deployments each instance sweeps
+  independently, which is sufficient because every instance can only ever
+  delete synthetic data matching the same prefix-and-age predicate.
+
+## Public one-page checker (`/scan`)
+
+`POST /api/public/scan` accepts exactly one public http(s) URL per call, is
+fully ephemeral (nothing is written to the database; the evaluated URL is
+never logged), applies every scanner SSRF control, and is rate-limited in
+memory (3 per IP per hour plus a global ceiling). On serverless those
+per-instance limits are not a hard distributed guarantee — configure a
+platform-level rate rule (Vercel Firewall on `POST /api/public/scan`, keyed
+by client IP) where available; see DEPLOYMENT.md §8 for the recommended
+scope and the honest limitation for plans without Firewall access.

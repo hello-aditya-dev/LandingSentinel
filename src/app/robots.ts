@@ -3,9 +3,9 @@ import { headers } from "next/headers";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 /**
- * robots.txt — the public marketing site (homepage; docs, licence, privacy
- * and demo views are hash fragments of it) is indexable. API routes and the
- * authenticated application are not promoted for indexing.
+ * robots.txt — public marketing, demo and documentation routes are
+ * indexable. API endpoints, the authenticated workspace and the sign-in
+ * screen are not promoted for indexing. The homepage is explicitly allowed.
  *
  * Resolved per request: NEXT_PUBLIC_SITE_URL → VERCEL_URL → the origin
  * actually serving the request.
@@ -28,7 +28,7 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/"],
+        disallow: ["/api/", "/app/", "/login"],
       },
     ],
     sitemap: siteUrl ? `${siteUrl}/sitemap.xml` : undefined,

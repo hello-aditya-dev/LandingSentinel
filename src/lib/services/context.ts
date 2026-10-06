@@ -42,7 +42,10 @@ export type WorkspaceContext = {
 async function ensureDemoSessionWorkspace(sessionId: string) {
   const slug = `${DEMO_SESSION_PREFIX}${sessionId}`;
   const existing = await db.workspace.findUnique({ where: { slug } });
-  if (existing) return existing;
+  if (existing) {
+    scheduleStaleDemoCleanup();
+    return existing;
+  }
 
   // Create + seed inside ONE transaction. The workspace row only becomes
   // visible when the whole synthetic dataset is committed, and the unique
@@ -51,18 +54,62 @@ async function ensureDemoSessionWorkspace(sessionId: string) {
   // winner commits, fail with a unique violation, and re-read a fully
   // seeded workspace — nobody ever observes a half-seeded demo.
   try {
-    return await db.$transaction(async (tx) => {
+    const workspace = await db.$transaction(async (tx) => {
       const workspace = await tx.workspace.create({
         data: { slug, name: "Demo Session (Synthetic)" },
       });
       await seedDemoSessionWorkspace(workspace.id, tx);
       return workspace;
     });
+    scheduleStaleDemoCleanup();
+    return workspace;
   } catch {
     // Lost the race (same instance or serverless multi-instance): the
     // winner's transaction has committed by now.
     return db.workspace.findUniqueOrThrow({ where: { slug } });
   }
+}
+
+/* ---------------------------------------------------------------- */
+/* Stale demo-session cleanup                                        */
+/* ---------------------------------------------------------------- */
+
+/**
+ * Durable cleanup of anonymous demo workspaces.
+ *
+ * Demo session workspaces (`demo:s:{uuid}`) are per-visitor synthetic
+ * sandboxes. They must not accumulate forever: whenever one is accessed or
+ * created, this opportunistically deletes demo-session workspaces whose
+ * database `createdAt` is older than the TTL (24h), using database
+ * timestamps — never the client clock.
+ *
+ * Safety: the `slug startsWith "demo:s:"` predicate can never match the
+ * buyer's real workspaces (`primary` or any custom slug); deleteMany is
+ * atomic; failures are swallowed (cleanup is best-effort and will retry on
+ * the next access); and an in-memory throttle keeps it to at most one sweep
+ * per process per hour instead of a delete on every request. On serverless
+ * multi-instance deployments each instance sweeps independently.
+ */
+const DEMO_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+let lastCleanupAt = 0;
+
+function scheduleStaleDemoCleanup(): void {
+  const now = Date.now();
+  if (now - lastCleanupAt < DEMO_CLEANUP_INTERVAL_MS) return;
+  lastCleanupAt = now;
+
+  const cutoff = new Date(now - DEMO_SESSION_TTL_MS);
+  void db.workspace
+    .deleteMany({
+      where: {
+        slug: { startsWith: DEMO_SESSION_PREFIX },
+        createdAt: { lt: cutoff },
+      },
+    })
+    .catch(() => {
+      // Best-effort: never let cleanup break a demo request. The throttle
+      // timestamp is reset so a transient failure retries within the hour.
+    });
 }
 
 export async function resolveContext(scope: Scope): Promise<WorkspaceContext> {

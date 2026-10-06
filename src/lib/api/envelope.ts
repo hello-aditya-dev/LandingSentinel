@@ -59,6 +59,42 @@ export function fail(
   );
 }
 
+/**
+ * Safe, actionable responses for known deployment-database states.
+ *
+ * When the deployment's PostgreSQL is unreachable (DATABASE_URL missing or
+ * wrong) or its schema has not been migrated, the backend KNOWS why every
+ * workspace request fails — the client is told that, in words that name the
+ * configuration step, never the database host, SQL or stack trace. These
+ * conditions are already reported publicly by /api/system diagnostics.
+ *
+ * Returns null when the error is not a known database-state failure.
+ */
+export function dbFailure(err: unknown): NextResponse | null {
+  const code = (err as { code?: string } | null)?.code;
+  const name = (err as { name?: string } | null)?.name ?? "";
+  const message = err instanceof Error ? err.message : "";
+  // Missing DATABASE_URL surfaces as an initialization error naming the
+  // variable; an unreachable server carries P1001/P1002. Both are deployment
+  // configuration states, not product failures.
+  const envMissing = name === "PrismaClientInitializationError" && message.includes("DATABASE_URL");
+  if (envMissing || code === "P1001" || code === "P1002") {
+    return fail(
+      "SERVER_FAILURE",
+      "The deployment database is not reachable — set DATABASE_URL and redeploy (see DEPLOYMENT.md). The demo needs the database to create its synthetic workspace.",
+      503
+    );
+  }
+  if (code === "P2021" || code === "P2022") {
+    return fail(
+      "SERVER_FAILURE",
+      "The database schema is not initialized — run the migration (npm run db:migrate, see DEPLOYMENT.md).",
+      503
+    );
+  }
+  return null;
+}
+
 type LogContext = Record<string, unknown>;
 
 /** Wrap a route handler with the standard error envelope + server logging. */
@@ -88,6 +124,16 @@ export function route<Args extends unknown[]>(
         return fail("INVALID_INPUT", "The request is not valid.", 400, {
           issues: err.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         });
+      }
+      const dbFail = dbFailure(err);
+      if (dbFail) {
+        serverLog("warn", "api_error", {
+          ...context,
+          path: new URL(req.url).pathname,
+          code: "DB_UNREACHABLE",
+          prismaCode: (err as { code?: string }).code,
+        });
+        return dbFail;
       }
       serverLog("error", "unhandled_route_error", {
         ...context,

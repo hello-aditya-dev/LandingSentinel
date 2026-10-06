@@ -1,5 +1,105 @@
 # Changelog
 
+## 0.1.3 — Production Routing & Reliability
+
+Production repair and routing-quality release. Two problems fixed on the real
+deployment: the public demo failed on Vercel (root cause: the deployment had
+no `DATABASE_URL`, so demo-workspace creation failed as a generic 500), and
+the product still used single-page hash routing. No redesign, no scanner-rule
+changes, no new product features; the test suite is unchanged at 175 tests.
+
+### Repaired production demo execution
+
+- **Root cause of "The demo scan could not start":** the production Vercel
+  project was deployed without `DATABASE_URL` (and without
+  `ADMIN_PASSWORD_HASH`). The demo is session-isolated and persists its
+  synthetic workspace in PostgreSQL — with no reachable database, the first
+  workspace query threw and the API answered a generic 500.
+- **Actionable failure copy (config honesty):** known deployment-database
+  states (missing/unreachable `DATABASE_URL`, schema not migrated) now return
+  a specific, safe message — "The deployment database is not reachable — set
+  DATABASE_URL and redeploy (see DEPLOYMENT.md)" — instead of the generic
+  "The server could not complete this request." No hostnames, SQL or stack
+  traces are exposed. The scan-start route no longer forwards raw internal
+  error text to clients.
+- DEPLOYMENT.md §8 now spells out the exact post-deploy step order:
+  environment variables → migrate the production database → verify
+  `/api/system`.
+
+### Migrated from hash routing to Next.js App Router routes
+
+- Real server routes replace the `/#/…` single-page hash router (the store is
+  deleted): `/`, `/demo`, `/demo/fixed`, `/demo/branding`, `/demo/import`,
+  `/demo/scans/[scanId]`, `/demo/findings/[findingId]`,
+  `/demo/reports/[reportId]`, `/scan`, `/docs`, `/license`, `/privacy`,
+  `/login`, `/app`, `/app/import`, `/app/scans`, `/app/scans/[scanId]`,
+  `/app/scans/[scanId]/findings/[findingId]`, `/app/findings/[findingId]`,
+  `/app/reports`, `/app/reports/[reportId]`, `/app/clients`, `/app/settings`,
+  `/app/settings/branding`, `/app/settings/scanning`, `/app/settings/system`.
+- A typed navigation layer (`src/lib/nav.ts`) translates the views'
+  route descriptors to real URLs through `next/navigation` — browser Back,
+  Forward, reload and deep links are native browser history now.
+- **Legacy links forward automatically:** `/#/demo`, `/#/app/…` etc. are
+  translated once on load to their clean paths (no second routing system is
+  maintained).
+- Demo scope preserved: demo-scoped detail routes (`/demo/scans/…`,
+  `/demo/findings/…`, `/demo/reports/…`, `/demo/import`) stay public,
+  synthetic and session-isolated inside the product chrome; `/app/*` stays
+  the authenticated real workspace.
+- Unauthenticated `/app/*` visits redirect to `/login?next=…` and return to
+  the originally requested route after sign-in; mid-session expiry does the
+  same. Protected page data never renders before authentication.
+- Route-aware metadata: exact titles (`Live Demo — LandingSentinel`,
+  `Scan a Landing Page — LandingSentinel`, …), per-route canonical URLs and
+  Open Graph descriptions; authenticated workspace routes are `noindex` and
+  carry no campaign information. `sitemap.xml` now lists the real public
+  routes (`/`, `/demo`, `/scan`, `/docs`, `/license`, `/privacy`);
+  `robots.txt` disallows `/api/`, `/app/` and `/login`.
+
+### Demo workspace cleanup (durable)
+
+- Anonymous demo-session workspaces (`demo:s:{uuid}`) are now deleted
+  opportunistically when older than 24 h, using database timestamps. The
+  delete predicate can only ever match `demo:s:`-prefixed synthetic
+  workspaces — never the buyer's real workspace — and runs at most once per
+  process per hour.
+
+### Money Map sticky-header defect fixed
+
+- The ledger's sticky `<thead>` inside the horizontal-scroll container was
+  positioned against that container's scrollport (not the page), sliding down
+  over the first row and swallowing the evidence button's click point at
+  short viewports. The broken sticky is removed — the ledger scrolls with the
+  page — and table rows carry scroll-margin so programmatic scrolls land
+  clear of the header band.
+
+### Demo scan pacing
+
+- The synthetic preflight no longer waits ~8–12 s for staging: per-target
+  stage pauses were cut to the minimum needed for observable progress
+  (genuine backend stages polled from the database). The first preflight
+  completes in a few seconds; the repaired-state comparison remains instant.
+
+### Public scanner deployment safeguards
+
+- Application-level rate limiting (3/IP/hour + global ceiling) is unchanged.
+  Vercel Firewall/WAF cannot be configured from this repository's tooling —
+  DEPLOYMENT.md §8 documents the recommended platform-level rule (strict
+  rate on `POST /api/public/scan` per client IP) and states the limitation
+  honestly for plans without Firewall access.
+
+### Production regression QA
+
+- Full local production journey re-verified on `next start`: demo flow
+  (before state → preflight → progress → DO NOT LAUNCH → Money Map →
+  evidence → report → repaired state → LAUNCH READY → reset), the one-page
+  checker with the real engine, authenticated app (login redirect + return,
+  import, scans, nested finding routes, reports, branding persistence,
+  logout protection), two-browser demo-session isolation, 390×844 mobile
+  pass with zero horizontal overflow, legacy-hash forwarding, 404 page, and
+  all metadata assets (icon, apple-icon, OG image, robots, sitemap) at 200.
+
+
 ## 0.1.2 — Production Polish
 
 Final production-identity and experience pass over the hardened release. No

@@ -10,7 +10,7 @@
  */
 
 import { useFindingDetail, useDashboard, useGenerateReport } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { SeverityBadge } from "@/components/paper/stamp";
 import { Money, EvidenceBlock, RedirectChain, CopyButton } from "@/components/paper/evidence";
@@ -30,7 +30,7 @@ const TRACKER_LABELS: Record<string, string> = {
 
 export function FindingDetailView({ scope, findingId }: { scope: "demo" | "app"; findingId: string }) {
   const { data, isLoading, isError, error } = useFindingDetail(scope, findingId);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   if (isError) {
     return (
@@ -253,7 +253,7 @@ export function FindingDetailView({ scope, findingId }: { scope: "demo" | "app";
 
 /** Guided path (public demo): the natural next beat after the first finding. */
 function DemoNextStep({ scope, scanId }: { scope: "demo" | "app"; scanId: string }) {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   const { data: dashboard } = useDashboard(scope);
   const generateReport = useGenerateReport(scope);
 

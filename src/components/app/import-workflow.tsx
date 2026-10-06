@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { api, ApiClientError, withScope } from "@/lib/client/api";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { Money } from "@/components/paper/evidence";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function ImportWorkflowView({ scope, demo }: { scope: "demo" | "app"; dem
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   const loadCsv = useCallback(
     async (text: string, name: string) => {

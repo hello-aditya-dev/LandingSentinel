@@ -248,20 +248,22 @@ async function scanOneTarget(
     );
     if (demoDestination) {
       if (fixtureDelays) {
-        // Staged progress so the demo scan is observable, like a real scan.
-        // Tuned so the 22-destination synthetic preflight completes in
-        // roughly 8–12 seconds — long enough to feel real, short enough to
-        // hold a prospect's attention (public demo target).
+        // Staged progress so the demo scan is observable, like a real scan —
+        // each destination walks the genuine backend stages (dns → request
+        // → redirects → inspect) that the progress panel polls. The pauses
+        // are the minimum needed for staged state to be observable; results
+        // are shown as soon as they exist. No artificial slowdown for drama:
+        // the 22-destination synthetic preflight completes in a few seconds.
         await setStage(target.id, "dns");
-        await sleep(340 + (demoDestination.pathname.length * 37) % 260);
+        await sleep(120 + (demoDestination.pathname.length * 13) % 90);
         await setStage(target.id, "request");
-        await sleep(370 + (demoDestination.hostname.length * 53) % 400);
+        await sleep(130 + (demoDestination.hostname.length * 19) % 140);
         if ((demoDestination.live.redirects ?? demoDestination.fixed.redirects ?? []).length > 0 && variant === "live") {
           await setStage(target.id, "redirects");
-          await sleep(270);
+          await sleep(95);
         }
         await setStage(target.id, "inspect");
-        await sleep(260 + (demoDestination.normalizedKey.length * 31) % 300);
+        await sleep(90 + (demoDestination.normalizedKey.length * 11) % 105);
       }
       result = fixtureFetch(demoDestination, variant, scanIndex);
     } else {

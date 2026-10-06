@@ -3,10 +3,14 @@
 /**
  * Application shell: top header + side navigation for the product views.
  * The marketing/demo views use their own chrome.
+ *
+ * Navigation is real Next.js routing: the side bar pushes `/app/…` paths and
+ * the active item derives from the current pathname.
  */
 
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useRouter, type Route } from "@/store/router";
+import { useAppNavigate, type Route } from "@/lib/nav";
 import { PRODUCT } from "@/config/product";
 import { MicroLabel } from "@/components/paper/paper";
 import { SentinelMark } from "@/components/paper/sentinel-mark";
@@ -20,13 +24,23 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-const NAV: { label: string; route: Route; icon: typeof LayoutDashboard; match: (r: Route) => boolean }[] = [
-  { label: "Overview", route: { view: "dashboard" }, icon: LayoutDashboard, match: (r) => r.view === "dashboard" },
-  { label: "Import campaigns", route: { view: "import" }, icon: FileUp, match: (r) => r.view === "import" },
-  { label: "Scans", route: { view: "scans" }, icon: Radar, match: (r) => r.view === "scans" || r.view === "scan" || r.view === "finding" },
-  { label: "Reports", route: { view: "reports" }, icon: FileText, match: (r) => r.view === "reports" || r.view === "report" },
-  { label: "Clients", route: { view: "clients" }, icon: Users, match: (r) => r.view === "clients" },
-  { label: "Settings", route: { view: "settings", tab: "overview" }, icon: Settings, match: (r) => r.view === "settings" },
+const NAV: { label: string; route: Route; icon: typeof LayoutDashboard; match: (pathname: string) => boolean }[] = [
+  { label: "Overview", route: { view: "dashboard" }, icon: LayoutDashboard, match: (p) => p === "/app" },
+  { label: "Import campaigns", route: { view: "import" }, icon: FileUp, match: (p) => p === "/app/import" },
+  {
+    label: "Scans",
+    route: { view: "scans" },
+    icon: Radar,
+    match: (p) => p === "/app/scans" || p.startsWith("/app/scans/") || p.startsWith("/app/findings/"),
+  },
+  {
+    label: "Reports",
+    route: { view: "reports" },
+    icon: FileText,
+    match: (p) => p === "/app/reports" || p.startsWith("/app/reports/"),
+  },
+  { label: "Clients", route: { view: "clients" }, icon: Users, match: (p) => p === "/app/clients" },
+  { label: "Settings", route: { view: "settings", tab: "overview" }, icon: Settings, match: (p) => p.startsWith("/app/settings") },
 ];
 
 export function AppShell({
@@ -44,8 +58,8 @@ export function AppShell({
   productName: string;
   headerActions?: ReactNode;
 }) {
-  const route = useRouter((s) => s.route);
-  const navigate = useRouter((s) => s.navigate);
+  const pathname = usePathname() ?? "/app";
+  const navigate = useAppNavigate();
 
   return (
     <div className="relative z-10 flex min-h-screen flex-col">
@@ -90,7 +104,7 @@ export function AppShell({
         <nav aria-label="Product navigation" className="lg:w-52 lg:shrink-0 print:hidden">
           <ul className="flex flex-row flex-wrap gap-1 lg:flex-col lg:gap-0.5">
             {NAV.map((item) => {
-              const active = item.match(route);
+              const active = item.match(pathname);
               return (
                 <li key={item.label}>
                   <button
@@ -132,7 +146,7 @@ export function AppShell({
 }
 
 export function DemoBar() {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   return (
     <div
       role="status"

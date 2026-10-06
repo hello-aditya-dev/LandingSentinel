@@ -134,6 +134,27 @@ break sign-in.
 
 LandingSentinel can be deployed to Vercel. Points that matter:
 
+- **Order of operations for a working deployment.** The demo and the
+  authenticated workspace both persist to PostgreSQL — a Vercel deployment
+  without a reachable database serves the marketing site and the one-page
+  checker, but the campaign demo will fail with a clear configuration
+  message until the database step is done. Complete in this order:
+  1. Provision PostgreSQL (Neon / Supabase / any reachable server) and copy
+     its connection string.
+  2. Project → Settings → Environment Variables → add `DATABASE_URL`
+     (Production) and `ADMIN_PASSWORD_HASH` (Production, from
+     `npm run hash-password`).
+  3. **Apply the committed migrations to that database once** from any
+     machine with network access to it: `DATABASE_URL="postgres://…" npm
+     run db:migrate` (this is `prisma migrate deploy` — additive and safe;
+     it never resets data).
+  4. Redeploy (or push a commit) so the functions start with the new
+     environment, then verify `GET /api/system` — `Database: ok`,
+     `Database schema: ok`, `Access control: ok`.
+  5. Optional: `DATABASE_URL="postgres://…" npm run db:seed` if you want the
+     shared demo workspace pre-seeded (the per-session public demo seeds
+     itself automatically).
+
 - **Environment variables** (Project → Settings → Environment Variables):
   - `DATABASE_URL` — your PostgreSQL connection string (Neon and Supabase are
     the common pairings; the SQLite-style file URL would not persist anyway).
@@ -150,6 +171,18 @@ LandingSentinel can be deployed to Vercel. Points that matter:
     up automatically when unset; set it when you attach a custom domain.
   - `NEXT_PUBLIC_*` branding values are inlined at build time, so changing
     them requires a redeploy.
+- **Public scanner rate limiting at the platform level (recommended).**
+  The application already rate-limits `POST /api/public/scan`
+  (3 per IP per hour plus a global ceiling, in memory per instance). On
+  serverless, per-instance limits are not a hard distributed guarantee, so
+  configure Vercel Firewall (Project → Security → Firewall) when your plan
+  has it: a rate-limit rule scoped to path `/api/public/scan`, method POST,
+  keyed by client IP, with a strict limit (e.g. 10/hour). Do **not** scope
+  it to the homepage, static assets, the demo fixture APIs or the
+  authenticated scan routes. Vercel Firewall configuration lives in the
+  dashboard (it cannot be expressed from this repository), so if your plan
+  has no Firewall access, the application-level limiter is the enforced
+  control — that limitation is stated here honestly.
 - **Node runtime.** All API routes — including the scanner routes — already
   declare `export const runtime = "nodejs"` in their source. The scanner uses
   Node APIs (DNS resolution, IP classification) that are not available in the

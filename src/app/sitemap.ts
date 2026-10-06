@@ -3,13 +3,12 @@ import { headers } from "next/headers";
 import { resolveSiteUrl } from "@/lib/site-url";
 
 /**
- * sitemap.xml — deliberately contains ONLY the root URL.
+ * sitemap.xml — the real public routes.
  *
- * LandingSentinel is a single-page application with hash-based routing:
- * the documentation, licence, privacy and demo views are fragments of `/`
- * (e.g. `/#/docs`), not server routes. Listing hash fragments as sitemap
- * URLs would be invalid, so this sitemap stays honest — one real,
- * indexable URL: the marketing homepage.
+ * The product uses real App Router URLs: the marketing homepage, the public
+ * demo, the one-page checker and the legal/documentation pages are indexable
+ * server routes. The authenticated workspace (`/app/…`) and the login screen
+ * are deliberately excluded.
  *
  * Resolved per request: NEXT_PUBLIC_SITE_URL → VERCEL_URL → the origin
  * actually serving the request.
@@ -33,12 +32,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     return [];
   }
 
+  const now = new Date();
+
   return [
     {
       url: `${siteUrl}/`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: "monthly",
       priority: 1,
+    },
+    {
+      url: `${siteUrl}/demo`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${siteUrl}/scan`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${siteUrl}/docs`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${siteUrl}/license`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${siteUrl}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
   ];
 }

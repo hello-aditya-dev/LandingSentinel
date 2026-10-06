@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useBranding, useSystem } from "@/lib/client/queries";
 import { api, withScope } from "@/lib/client/api";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ import { useQueryClient } from "@tanstack/react-query";
 type Tab = "overview" | "branding" | "scanning" | "system";
 
 export function SettingsView({ scope, tab }: { scope: "demo" | "app"; tab: Tab }) {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   const tabs: { key: Tab; label: string }[] = [
     { key: "overview", label: "Overview" },
     { key: "branding", label: "White-label branding" },

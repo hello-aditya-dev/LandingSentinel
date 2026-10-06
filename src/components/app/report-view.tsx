@@ -9,7 +9,7 @@
  */
 
 import { useReportDetail } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { StatusStamp, SeverityBadge } from "@/components/paper/stamp";
 import { Money, EvidenceBlock, RedirectChain } from "@/components/paper/evidence";
@@ -25,7 +25,7 @@ export function ReportView({ scope, reportId }: { scope: "demo" | "app"; reportI
   // (The hook is always called; the override only applies to demo scope.)
   const demoBrandingOverride = useDemoBranding((st) => st.override);
   const { data, isLoading, isError, error } = useReportDetail(scope, reportId);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   if (isError) {
     return (

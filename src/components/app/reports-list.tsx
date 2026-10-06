@@ -1,7 +1,7 @@
 "use client";
 
 import { useReportList, useGenerateReport, useScanList } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { StatusStamp } from "@/components/paper/stamp";
 import { Money } from "@/components/paper/evidence";
@@ -14,7 +14,7 @@ export function ReportsListView({ scope }: { scope: "demo" | "app" }) {
   const { data, isLoading } = useReportList(scope);
   const { data: scanData } = useScanList(scope);
   const generate = useGenerateReport(scope);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   if (isLoading || !data) {
     return <Skeleton className="h-64 rounded-[2px] bg-paper-deep" />;

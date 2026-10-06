@@ -14,7 +14,7 @@
 
 import { useMemo, useState } from "react";
 import { useScanDetail, useGenerateReport } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { StatusStamp, SeverityBadge, StatusCell } from "@/components/paper/stamp";
 import { Money, CopyButton } from "@/components/paper/evidence";
@@ -48,7 +48,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanId: string }) {
   const { data, isLoading, isError, error } = useScanDetail(scope, scanId);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   const generateReport = useGenerateReport(scope);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -330,8 +330,14 @@ export function ScanDetailView({ scope, scanId }: { scope: "demo" | "app"; scanI
           <>
             {/* Desktop ledger table */}
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[880px] border-collapse text-left">
-                <thead className="sticky top-[57px] z-10 bg-paper-raised">
+                <table className="w-full min-w-[880px] border-collapse text-left">
+                  {/* No sticky header here: a position:sticky thead inside an
+                      overflow-x-auto container is positioned against that
+                      container's scrollport, not the page — it slides down
+                      over the first row and swallows the evidence button's
+                      click point (the defect QA hit at short viewports).
+                      The ledger scrolls with the page instead. */}
+                  <thead className="bg-paper-raised">
                   <tr className="border-b border-hairline-strong">
                     <th scope="col" className="micro-label px-3 py-2 text-left">#</th>
                     <th scope="col" className="micro-label px-3 py-2 text-left">DESTINATION</th>
@@ -458,11 +464,15 @@ function PrimaryFindingCell({ row }: { row: MoneyMapRow }) {
 }
 
 function MoneyMapRowDesktop({ row, campaigns, scope }: { row: MoneyMapRow; campaigns: { platform: string | null; campaignName: string | null; spendMinor: number; currency: string }[]; scope: "demo" | "app" }) {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   return (
     <tr
+      // scroll-margin keeps the first actionable row clear of the sticky
+      // table header + page header: scrollIntoView and anchor jumps land
+      // the row below the sticky band, so the evidence button's click point
+      // is never covered (fixed the short-viewport overlap defect).
       className={cn(
-        "ledger-row align-top transition-colors",
+        "ledger-row scroll-mt-32 align-top transition-colors",
         row.status === "critical" && "bg-critical-wash/40",
         row.status === "warning" && "bg-warning-wash/30"
       )}
@@ -517,9 +527,9 @@ function MoneyMapRowDesktop({ row, campaigns, scope }: { row: MoneyMapRow; campa
 }
 
 function MoneyMapRowMobile({ row, campaigns, scope }: { row: MoneyMapRow; campaigns: { platform: string | null; campaignName: string | null; spendMinor: number; currency: string }[]; scope: "demo" | "app" }) {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   return (
-    <div className={cn("border-b border-hairline px-4 py-3", row.status === "critical" && "bg-critical-wash/40", row.status === "warning" && "bg-warning-wash/30")}>
+    <div className={cn("scroll-mt-24 border-b border-hairline px-4 py-3", row.status === "critical" && "bg-critical-wash/40", row.status === "warning" && "bg-warning-wash/30")}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="num font-mono text-[10px] text-ink-3">{String(row.priority).padStart(2, "0")} · {row.hostname}</span>

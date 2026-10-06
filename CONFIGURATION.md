@@ -84,7 +84,7 @@ full precedence rules.
 | --- | --- | --- | --- | --- |
 | `NEXT_PUBLIC_CHECKOUT_URL` | no | empty | `https://buy.example.com/landing-sentinel` | Payment link for the marketing site's Buy button. When unset, production shows the licence CTA only and development shows a configuration note — never a dead link, and no payment provider is hard-wired. |
 | `NEXT_PUBLIC_PORTFOLIO_URL` | no | empty | `https://example.com` | Optional portfolio link shown in the marketing footer ("Built by …"). |
-| `NEXT_PUBLIC_PAGE_CHECK_ENABLED` | no | `true` | `false` | Enables the one-page public checker (`/#/scan`, `POST /api/public/scan`): anonymous single-URL evaluations with the real engine — rate-limited (3/IP/hour + global ceiling), SSRF-hardened, fully ephemeral. `false` hides the homepage CTA and disables the route. Changing it requires a rebuild. |
+| `NEXT_PUBLIC_PAGE_CHECK_ENABLED` | no | `true` | `false` | Enables the one-page public checker (`/scan`, `POST /api/public/scan`): anonymous single-URL evaluations with the real engine — rate-limited (3/IP/hour + global ceiling), SSRF-hardened, fully ephemeral. `false` hides the homepage CTA and disables the route. Changing it requires a rebuild. |
 
 ## Site URL (metadata)
 

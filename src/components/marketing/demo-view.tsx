@@ -22,7 +22,7 @@ import {
   useGenerateReport,
   useBranding,
 } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { useDemoBranding } from "@/store/demo-branding";
 import { DemoBar } from "../app/app-shell";
 import { ScanDetailView } from "../app/scan-detail";
@@ -44,7 +44,7 @@ export function DemoView({ panel }: { panel?: "fixed" | "branding" }) {
   const { data: dashboard } = useDashboard(scope);
   const startScan = useStartScan(scope);
   const generateReport = useGenerateReport(scope);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   const queryClient = useQueryClient();
   // The variant is derived from the route panel (hash) — every state change
   // is a navigation, so the demo state is always deep-linkable.
@@ -104,7 +104,6 @@ export function DemoView({ panel }: { panel?: "fixed" | "branding" }) {
     if (panel === "fixed" && !latestFixed && !fixedRunning && !startScan.isPending && !isLoading) {
       runFixedScan();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel, latestFixed, fixedRunning, isLoading, startScan.isPending]);
 
   const runPreflight = () => {
@@ -392,7 +391,7 @@ function BrandingPlayground({ onViewReport, reportPending }: { onViewReport: () 
   const override = useDemoBranding((s) => s.override);
   const setOverride = useDemoBranding((s) => s.setOverride);
   const clearOverride = useDemoBranding((s) => s.clearOverride);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
 
   if (isLoading || !data) return null;
   const branding = data.branding;

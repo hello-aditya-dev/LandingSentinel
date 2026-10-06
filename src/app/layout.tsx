@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Source_Serif_4, Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { resolveSiteUrl } from "@/lib/site-url";
+import { Providers } from "@/components/app/providers";
+import { HashCompat } from "@/components/app/hash-compat";
 
 // Editorial display serif — report titles and major headlines only.
 const displaySerif = Source_Serif_4({
@@ -29,37 +32,45 @@ const evidenceMono = IBM_Plex_Mono({
 
 /**
  * Canonical URL strategy: resolveSiteUrl() (NEXT_PUBLIC_SITE_URL → VERCEL_URL
- * → localhost in development) is used when available; the homepage adds a
- * request-origin fallback at runtime (see src/app/page.tsx), so absolute-URL
- * metadata is always honest and never points at a domain that does not exist.
+ * → localhost in development) with a per-request origin fallback, so absolute-
+ * URL metadata (OG/Twitter cards) is always honest on any host, including
+ * Vercel aliases and custom domains, with zero required configuration.
  */
-const siteUrl = resolveSiteUrl();
+export async function generateMetadata(): Promise<Metadata> {
+  let siteUrl = resolveSiteUrl();
 
-export const metadata: Metadata = {
-  metadataBase: siteUrl ? new URL(siteUrl) : undefined,
-  title: {
-    default: "LandingSentinel — Paid-Media Landing Page Preflight",
-    template: "%s · LandingSentinel",
-  },
-  description:
-    "Scan paid-media landing pages for broken destinations, tracking gaps, redirect problems and attribution issues. Prioritize findings by associated campaign spend.",
-  applicationName: "LandingSentinel",
-  robots: { index: true, follow: true },
-  alternates: siteUrl ? { canonical: "/" } : undefined,
-  openGraph: {
-    type: "website",
-    siteName: "LandingSentinel",
-    title: "LandingSentinel — Paid-Media Landing Page Preflight",
+  if (!siteUrl) {
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
+    if (host) siteUrl = `${proto}://${host}`;
+  }
+
+  return {
+    ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
+    title: {
+      default: "LandingSentinel — Paid-Media Landing Page Preflight",
+      template: "%s · LandingSentinel",
+    },
     description:
       "Scan paid-media landing pages for broken destinations, tracking gaps, redirect problems and attribution issues. Prioritize findings by associated campaign spend.",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "LandingSentinel — Paid-Media Landing Page Preflight",
-    description:
-      "Spend-weighted technical evidence for paid-media teams. White-label, self-hosted, source included.",
-  },
-};
+    applicationName: "LandingSentinel",
+    robots: { index: true, follow: true },
+    openGraph: {
+      type: "website",
+      siteName: "LandingSentinel",
+      title: "LandingSentinel — Paid-Media Landing Page Preflight",
+      description:
+        "Scan paid-media landing pages for broken destinations, tracking gaps, redirect problems and attribution issues. Prioritize findings by associated campaign spend.",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "LandingSentinel — Paid-Media Landing Page Preflight",
+      description:
+        "Spend-weighted technical evidence for paid-media teams. White-label, self-hosted, source included.",
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#f4f0e7",
@@ -77,7 +88,10 @@ export default function RootLayout({
       <body
         className={`${displaySerif.variable} ${uiSans.variable} ${evidenceMono.variable} antialiased bg-paper text-ink`}
       >
-        {children}
+        <Providers>
+          <HashCompat />
+          {children}
+        </Providers>
         <Toaster />
       </body>
     </html>

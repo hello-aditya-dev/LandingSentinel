@@ -7,7 +7,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useDashboard, useStartScan } from "@/lib/client/queries";
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MicroLabel, DossierLine, MarginNote } from "@/components/paper/paper";
 import { StatusStamp } from "@/components/paper/stamp";
 import { MetricFigure, Money } from "@/components/paper/evidence";
@@ -18,7 +18,7 @@ import { toast } from "@/hooks/use-toast";
 
 export function DashboardView({ scope }: { scope: "demo" | "app" }) {
   const { data, isLoading, isError, error } = useDashboard(scope);
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   const startScan = useStartScan(scope);
   const queryClient = useQueryClient();
 
@@ -224,7 +224,7 @@ function MetricCell({
 }
 
 function EmptyDashboard() {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   return (
     <Sheet label="START" title="No campaign data yet">
       <div className="flex flex-col items-start gap-4 px-4 py-8 sm:px-6">

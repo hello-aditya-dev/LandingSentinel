@@ -5,13 +5,13 @@
  * claims — just what this deployment actually stores, requests and logs.
  */
 
-import { useRouter } from "@/store/router";
+import { useAppNavigate } from "@/lib/nav";
 import { Sheet, MarginNote } from "@/components/paper/paper";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Database } from "lucide-react";
 
 export function PrivacyView() {
-  const navigate = useRouter((s) => s.navigate);
+  const navigate = useAppNavigate();
   return (
     <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-10 sm:px-6">
       <Button variant="ghost" size="sm" onClick={() => navigate({ view: "home" })} className="w-fit gap-2 px-0 text-ink-2">

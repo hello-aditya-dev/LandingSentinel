@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ok, fail, route } from "@/lib/api/envelope";
+import { ok, fail, route, dbFailure } from "@/lib/api/envelope";
 import { resolveContext } from "@/lib/services/context";
 import { executeScan } from "@/lib/scanner/runner";
 import { listScans } from "@/lib/services/queries";
@@ -56,19 +56,33 @@ export const POST = route(async (req) => {
       label: parsed.data.label ?? null,
       variant: parsed.data.variant,
       // The public demo's "after fixes" state appears immediately: staged
-      // delays exist to make the FIRST preflight feel real; the repaired
-      // state is a comparison view, not a re-enactment.
+      // progress pacing exists for the FIRST preflight; the repaired state
+      // is a comparison view, not a re-enactment.
       ...(ctx.scanEngine === "demo-fixture" && parsed.data.variant === "fixed"
         ? { fixtureDelays: false }
         : {}),
     });
     return ok(result, 201);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "The scan could not be started.";
     const code = (err as { code?: string }).code;
     if (code === "INVALID_IMPORT") {
+      const message = err instanceof Error ? err.message : "The import batch is not usable.";
       return fail("INVALID_IMPORT", message, 400);
     }
-    return fail("SERVER_FAILURE", message, 500);
+    // Known deployment-database states get safe, actionable copy. Anything
+    // else is logged server-side and reported generically — raw error text
+    // (which can contain hostnames or SQL) never reaches the client.
+    const dbFail = dbFailure(err);
+    if (dbFail) return dbFail;
+    console.error(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        level: "error",
+        event: "scan_start_failure",
+        code: code ?? "UNKNOWN",
+        error: err instanceof Error ? err.message : String(err),
+      })
+    );
+    return fail("SERVER_FAILURE", "The scan could not be started. Try again.", 500);
   }
 });
