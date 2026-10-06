@@ -22,10 +22,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "./app-shell";
 import { useBranding, useDashboard, useSession, useLogout } from "@/lib/client/queries";
 import { LoginView } from "./login-view";
+import { ApiClientError } from "@/lib/client/api";
 import { FileUp, Radar, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppNavigate } from "@/lib/nav";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, MarginNote } from "@/components/paper/paper";
 
 export function WorkspaceShell({
   scope,
@@ -41,7 +43,7 @@ export function WorkspaceShell({
 
   const { data: brandingData } = useBranding(scope);
   const { data: dashboard } = useDashboard(scope);
-  const { data: session, isLoading: sessionLoading } = useSession(scope);
+  const { data: session, isLoading: sessionLoading, isError: sessionError, error: sessionErrorObj } = useSession(scope);
   const logout = useLogout(scope);
 
   // Session expiry mid-view: any API call that returns AUTH_REQUIRED fires
@@ -101,7 +103,24 @@ export function WorkspaceShell({
       }
     >
       <div style={branding ? ({ ["--brand-accent" as string]: branding.accentColor } as React.CSSProperties) : undefined}>
-        {scope === "app" && needsSignIn && session ? (
+        {scope === "app" && sessionError ? (
+          // The deployment cannot resolve its workspace state at all (for
+          // example a missing/unreachable database): say so honestly instead
+          // of rendering protected views whose queries would all fail.
+          <Sheet label="WORKSPACE UNAVAILABLE" title="The workspace cannot be reached">
+            <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
+              <p className="text-[13.5px] leading-relaxed text-ink-2">
+                {sessionErrorObj instanceof ApiClientError
+                  ? sessionErrorObj.message
+                  : "The server could not complete this request."}
+              </p>
+              <MarginNote>
+                Run `GET /api/system` for the deployment's configuration diagnostics, or see
+                DEPLOYMENT.md for the setup order (environment variables, migration, redeploy).
+              </MarginNote>
+            </div>
+          </Sheet>
+        ) : scope === "app" && needsSignIn && session ? (
           // Redirecting to /login — never render protected views while
           // unauthenticated. A brief neutral skeleton bridges the moment.
           <div className="flex flex-col gap-4" aria-busy="true">
@@ -138,7 +157,7 @@ export function LoginRoute() {
 }
 
 function LoginRouteInner() {
-  const { data: session, isLoading } = useSession("app");
+  const { data: session, isLoading, isError, error } = useSession("app");
   const router = useRouter();
   const next = useNextParam();
 
@@ -151,6 +170,34 @@ function LoginRouteInner() {
       router.replace(next ?? "/app");
     }
   }, [session, router, next]);
+
+  if (isError) {
+    // The deployment cannot resolve its access-control state (for example
+    // a missing/unreachable database): show the actionable reason instead
+    // of an endless skeleton.
+    return (
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-5 py-10">
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="micro-label w-fit transition-colors hover:text-ink"
+        >
+          ← LANDINGSENTINEL
+        </button>
+        <Sheet label="SIGN-IN UNAVAILABLE" title="Sign-in cannot be reached">
+          <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
+            <p className="text-[13.5px] leading-relaxed text-ink-2">
+              {error instanceof ApiClientError ? error.message : "The server could not complete this request."}
+            </p>
+            <MarginNote>
+              Run `GET /api/system` for the deployment's configuration diagnostics, or see
+              DEPLOYMENT.md for the setup order (environment variables, migration, redeploy).
+            </MarginNote>
+          </div>
+        </Sheet>
+      </div>
+    );
+  }
 
   if (isLoading || !session) {
     return (
