@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { WorkspaceShell } from "@/components/app/workspace-shell";
 
 export const metadata: Metadata = {
-  title: "Workspace — LandingSentinel",
+  title: { absolute: "Workspace — LandingSentinel" },
   // The authenticated workspace holds real client campaign data — never
   // promoted for indexing, and no campaign information appears in metadata.
   robots: { index: false, follow: false },
