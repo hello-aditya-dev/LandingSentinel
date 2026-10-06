@@ -1,5 +1,109 @@
 # Changelog
 
+## 0.1.4 — Commercial Freeze
+
+Final commercial engineering pass before the sales freeze. Scope held to
+exactly four areas: production reliability, buyer documentation, the Agency
+Commercial Licence, and direct checkout on the site. No scanner changes, no
+redesign, no new product features; the existing scanner/security suite is
+unchanged and the payment work adds a dedicated suite (206 tests total, up
+from 175).
+
+### Production readiness
+
+- `/api/system` (and Settings → System) now also report **Site URL**
+  configuration (explicit `NEXT_PUBLIC_SITE_URL` vs derived deployment URL)
+  and **Checkout** provider availability (PayPal mode + Razorpay, or an
+  explicit not-configured warning) — never green when the underlying
+  subsystem is absent.
+- Buyer sequence documented and verified end to end: `npm install` →
+  `db:migrate` (`prisma migrate deploy`, additive only) → `db:seed` →
+  `npm run qa` → `npm run build` → `npm run start` → sign in at `/login`;
+  final verification at `/app/settings/system` and `/api/system`
+  (QUICKSTART.md).
+
+### Quick Start and Troubleshooting (buyer documentation)
+
+- **QUICKSTART.md** — one-to-two-page zero-to-deploy path for buyers:
+  requirements, install, the two required environment variables, admin
+  password generation (`npm run hash-password`), database migrate + seed,
+  QA + build, start, login route, minimal Vercel deployment, final
+  configuration check.
+- **TROUBLESHOOTING.md** — fifteen operational failure scenarios (database
+  unreachable / schema missing / admin hash missing / password rejected /
+  public scanner disabled / 403-429 targets / scan timeouts / Vercel
+  60-second limit / static tracking-detection limits / mixed currencies /
+  CSV mapping / report printing / demo initialization / env changes
+  requiring redeploy / public-checker rate limiting), each with Symptom ·
+  Likely cause · Fix.
+- README documentation map reorganized buyer-first (Quick Start and
+  Troubleshooting lead).
+
+### Agency Commercial Licence
+
+- **LICENSE.md** rewritten as the *LandingSentinel Agency Commercial
+  Licence — Founding Agency Commercial Licence* (licence version
+  `agency-commercial-2026-10`, 23 sections): perpetual non-exclusive
+  licence; unlimited internal users, client work and agency-controlled
+  deployments; full white-label rights with **no required attribution**;
+  modification and private-fork rights; employee/contractor and client
+  access rules; the explicit **right to charge clients**; narrow
+  source-redistribution restrictions (hosted/competing services explicitly
+  allowed); business-successor transfer; 12 months of 0.x updates (received
+  versions perpetual — no lifetime-updates promise); 30 days installation
+  support; 7-day technical guarantee with honest refund terms; honest
+  disclaimers (scannability, static tag detection, no ad-performance
+  guarantees, associated spend ≠ loss); no licence server and no telemetry;
+  precedence over the summary.
+- **LICENSE-SUMMARY.md** — one-page plain-English companion (YOU CAN /
+  YOU CANNOT).
+- The `/license` page now mirrors the new licence: the summary columns,
+  the quick facts, and the full text (anchor `#full-licence`).
+
+### Commercial checkout (/buy)
+
+- **`/buy`** — paper-dossier purchase page: the offer (£349 once, 13
+  listed rights), the own-the-deployment and one-licence arithmetic
+  sections, the short buyer form, an unticked licence-agreement checkbox
+  linking the summary and full licence, and provider selection.
+- **PayPal checkout** (international): server-side order creation and
+  capture via the Orders API v2 (sandbox/live), PayPal-hosted approval,
+  server-authoritative confirmation at `/buy/success`, and an authenticated
+  webhook (`POST /api/webhooks/paypal`) using PayPal's verification API.
+- **Razorpay checkout** (India): server-side order creation, checkout
+  modal with public key only, HMAC-SHA256 signature verification plus a
+  server-side payment fetch (amount + status), and an authenticated
+  webhook (`POST /api/webhooks/razorpay`).
+- **Purchase records** (new Prisma model + migration): provider, provider
+  order/payment ids (unique — idempotency), buyer identity, product SKU
+  `landingsentinel-agency-founding`, accepted licence edition
+  `agency-commercial-2026-10`, integer minor-unit amount + currency,
+  status (pending/paid/failed/refunded) and fulfilment status. `paid` is
+  reachable **only** through server-verified provider data; duplicates are
+  no-ops; wrong amount/currency/provider/SKU are rejected.
+- **`/buy/success`** — shows a confirmed purchase only after server
+  verification (capture or signature), with provider, amount, reference
+  and buyer email; manual-delivery note; post-purchase-only custom-
+  engineering and referral blocks. Cancelled/failed payments render
+  honest not-completed states with a retry path — never a fake success.
+- Money is integer minor units everywhere (`LANDINGSENTINEL_PRICE_GBP_MINOR`,
+  default 34900; `LANDINGSENTINEL_PRICE_INR_MINOR` owner-selected; no
+  exchange-rate conversion anywhere).
+- Marketing CTAs: the homepage's primary sales CTA is now **BUY AGENCY
+  LICENCE — £349 → /buy** (the external-checkout-link env var
+  `NEXT_PUBLIC_CHECKOUT_URL` is retired); the demo's verdict moment
+  (DO NOT LAUNCH / LAUNCH READY) gains **PUT THIS UNDER YOUR AGENCY'S
+  BRAND → Buy Agency Licence**; the one-page checker's bridge keeps its
+  demo and buy paths; the licence page ends in a native buy CTA.
+- `/buy` added to the sitemap; `/buy/success` excluded from indexing
+  (robots + per-page noindex).
+- **docs/SALES-HANDOFF.md** — internal fulfilment runbook (verify paid →
+  deliver package → licence → Quick Start → installation support → record
+  delivered) with the referral and engineering-upsell language.
+- Checkout configuration documented in CONFIGURATION.md (new
+  "Commercial checkout" section) and DEPLOYMENT.md §12 (provider setup,
+  webhook registration, sandbox → live, fulfilment).
+
 ## 0.1.3 — Production Routing & Reliability
 
 Production repair and routing-quality release. Two problems fixed on the real

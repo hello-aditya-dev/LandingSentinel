@@ -267,3 +267,33 @@ model AdminSession {
   lastSeenAt DateTime?
   expiresAt  DateTime
 }
+
+// Commercial purchases (see docs/SALES-HANDOFF.md). Money is integer minor
+// units + ISO currency, like everywhere else. `status` transitions to
+// "paid" ONLY through server-side provider verification (capture check or
+// authenticated webhook) — never from client input. Unique provider ids
+// make webhook processing idempotent.
+model Purchase {
+  id                String    @id @default(cuid())
+  provider          String // paypal | razorpay
+  providerOrderId   String?   @unique
+  providerPaymentId String?   @unique
+  buyerName         String
+  buyerEmail        String
+  businessName      String
+  country           String
+  website           String?
+  productSku        String    @default("landingsentinel-agency-founding")
+  licenseEdition    String    @default("agency-commercial-2026-10")
+  amountMinor       Int
+  currency          String
+  status            String    @default("pending") // pending | paid | failed | refunded
+  fulfillmentStatus String    @default("pending") // pending | delivered
+  licenceAcceptedAt DateTime?
+  createdAt         DateTime  @default(now())
+  paidAt            DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([buyerEmail, createdAt])
+}

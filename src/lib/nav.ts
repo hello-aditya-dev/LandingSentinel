@@ -19,6 +19,7 @@ export type Route =
   | { view: "home" }
   | { view: "demo"; panel?: "fixed" | "branding" }
   | { view: "scanOne" }
+  | { view: "buy" }
   | { view: "docs" }
   | { view: "license" }
   | { view: "privacy" }
@@ -41,6 +42,8 @@ export function routeToPath(route: Route): string {
       return route.panel === "fixed" ? "/demo/fixed" : route.panel === "branding" ? "/demo/branding" : "/demo";
     case "scanOne":
       return "/scan";
+    case "buy":
+      return "/buy";
     case "docs":
       return "/docs";
     case "license":

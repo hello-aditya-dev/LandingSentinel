@@ -22,8 +22,8 @@ function boolEnv(name: string, fallback: boolean): boolean {
 export const PRODUCT = {
   name: process.env.NEXT_PUBLIC_PRODUCT_NAME || "LandingSentinel",
   tagline: "Paid-media landing-page preflight",
-  version: "0.1.3",
-  releaseName: "Production Routing & Reliability",
+  version: "0.1.4",
+  releaseName: "Commercial Freeze",
   price: "£349",
   priceLine: "One-time payment · Founding agency licence",
 
@@ -34,7 +34,6 @@ export const PRODUCT = {
   // Seller / portfolio references (marketing site only)
   portfolioUrl: process.env.NEXT_PUBLIC_PORTFOLIO_URL || "",
   portfolioLabel: "Built by Aditya",
-  checkoutUrl: process.env.NEXT_PUBLIC_CHECKOUT_URL || "",
   supportEmail: process.env.SUPPORT_EMAIL || "",
 
   // Runtime modes

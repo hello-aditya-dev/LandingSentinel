@@ -20,6 +20,7 @@ wherever you point `DATABASE_URL`). Nothing is stored anywhere else.
 | Findings | Title, summary, explanation, recommendation, severity, confidence, associated spend, and the **structured evidence** (status codes, parameter diffs, tracker signature excerpts, DNS/TLS/timeout details). Plus incident history: first seen, last seen, resolved. |
 | Reports | Title, generation timestamp, and a snapshot of the branding at generation time. |
 | Branding | The white-label fields you save in Settings. |
+| Purchases (when you sell on your deployment) | If `/buy` checkout is configured: buyer name, business name, business email, country, optional website, payment provider, provider order/payment identifiers, product SKU, accepted licence edition, amount as integer minor units + currency, status (pending / paid / failed / refunded), fulfilment status, and timestamps. Stored for delivery, support and refunds only — **card data never touches the deployment**; it stays with PayPal or Razorpay. |
 | Admin sessions | One row per administrator session: **only the SHA-256 hash of the opaque session-cookie token** (never the token itself), plus creation time, a `lastSeenAt` timestamp and the expiry. Rows are deleted on logout and when an expired session is observed. |
 
 The scanner does not keep page HTML. It reads the response body in memory,

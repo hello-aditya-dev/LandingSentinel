@@ -446,31 +446,25 @@ export function HomeView() {
                     </ul>
                   </div>
                   <div className="border-t border-hairline px-5 py-4">
-                    {PRODUCT.checkoutUrl ? (
-                      <a
-                        href={PRODUCT.checkoutUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 border border-ink bg-ink px-5 py-2.5 text-[14px] font-medium text-paper transition-opacity hover:opacity-90"
-                      >
-                        Buy commercial licence <ArrowRight size={14} aria-hidden="true" />
-                      </a>
-                    ) : process.env.NODE_ENV === "development" ? (
-                      <div>
-                        <p className="text-[12.5px] text-ink-2">
-                          Checkout is not configured on this deployment. Sellers connect their own payment link via{" "}
-                          <span className="font-mono text-[11.5px]">NEXT_PUBLIC_CHECKOUT_URL</span> — the product ships
-                          with no payment provider hard-wired.
-                        </p>
-                        <Button size="sm" variant="outline" className="mt-3" onClick={() => navigate({ view: "license" })}>
-                          Read the licence terms
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => navigate({ view: "license" })}>
-                        Read the licence terms
-                      </Button>
-                    )}
+                    <Button
+                      size="lg"
+                      onClick={() => navigate({ view: "buy" })}
+                      className="gap-2 rounded-[2px] px-6 py-3 text-[15px]"
+                    >
+                      Buy agency licence — {PRODUCT.price} <ArrowRight size={16} aria-hidden="true" />
+                    </Button>
+                    <p className="mt-2 text-[12px] leading-relaxed text-ink-3">
+                      Secure checkout on this site — PayPal (international) or Razorpay (India). The
+                      buyer first sees the offer, the rights and the licence; payment comes after.
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => navigate({ view: "license" })}
+                    >
+                      Read the licence terms
+                    </Button>
                   </div>
                 </Sheet>
               </div>
@@ -490,7 +484,7 @@ export function HomeView() {
                 {[
                   ["Version", `${PRODUCT.version} · ${PRODUCT.releaseName}`],
                   ["Stack", "Next.js · TypeScript · Tailwind · shadcn/ui"],
-                  ["Database", "PostgreSQL (SQLite for the bundled demo)"],
+                  ["Database", "PostgreSQL (hosted or self-hosted)"],
                   ["Deployment", "Vercel-compatible · Node runtime scanner"],
                   ["Source", "Included"],
                   ["White-label", "Included"],

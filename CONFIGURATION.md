@@ -82,7 +82,6 @@ full precedence rules.
 
 | Variable | Required | Default | Example | What it does |
 | --- | --- | --- | --- | --- |
-| `NEXT_PUBLIC_CHECKOUT_URL` | no | empty | `https://buy.example.com/landing-sentinel` | Payment link for the marketing site's Buy button. When unset, production shows the licence CTA only and development shows a configuration note — never a dead link, and no payment provider is hard-wired. |
 | `NEXT_PUBLIC_PORTFOLIO_URL` | no | empty | `https://example.com` | Optional portfolio link shown in the marketing footer ("Built by …"). |
 | `NEXT_PUBLIC_PAGE_CHECK_ENABLED` | no | `true` | `false` | Enables the one-page public checker (`/scan`, `POST /api/public/scan`): anonymous single-URL evaluations with the real engine — rate-limited (3/IP/hour + global ceiling), SSRF-hardened, fully ephemeral. `false` hides the homepage CTA and disables the route. Changing it requires a rebuild. |
 
@@ -96,7 +95,31 @@ full precedence rules.
 
 | Variable | Required | Default | Example | What it does |
 | --- | --- | --- | --- | --- |
-| `SUPPORT_EMAIL` | no | empty | `support@your-agency.example` | Fallback support email for branding and reports when none is set in the database. |
+| `SUPPORT_EMAIL` | no | empty | `support@your-agency.example` | Fallback support email for branding and reports when none is set in the database. Also used by the post-purchase "Discuss customization" contact on `/buy/success`. |
+
+## Commercial checkout — /buy (server-only)
+
+The `/buy` route sells the LandingSentinel Agency Commercial Licence directly
+on this deployment. All money is fixed integer minor units resolved on the
+server — the browser never sends an amount, a status, or a SKU. See
+DEPLOYMENT.md §12 for the full provider setup (webhooks, sandbox → live).
+
+| Variable | Required | Default | Example | What it does |
+| --- | --- | --- | --- | --- |
+| `LANDINGSENTINEL_PRICE_GBP_MINOR` | no | `34900` | `34900` | Canonical international price in GBP minor units (£349). Never recalculated dynamically; the public price never changes with exchange rates. |
+| `LANDINGSENTINEL_PRICE_INR_MINOR` | for Razorpay | none | `2890000` | Fixed India sticker price in INR minor units (paise). Razorpay stays unavailable until the owner selects this price — no silent exchange-rate conversion happens anywhere. |
+| `PAYPAL_CLIENT_ID` | for PayPal | none | — | PayPal REST API client id. Together with the secret, enables PayPal checkout on `/buy`. |
+| `PAYPAL_CLIENT_SECRET` | for PayPal | none | — | PayPal REST API client secret. Server-only — never reaches client JavaScript; orders are created and captured server-side. |
+| `PAYPAL_ENV` | no | `sandbox` | `live` | `sandbox` or `live`. Selects the PayPal API base. Keep `sandbox` until live credentials are verified. |
+| `PAYPAL_WEBHOOK_ID` | for webhooks | none | — | The webhook id from the PayPal dashboard. Required for `POST /api/webhooks/paypal` signature verification; without it the endpoint answers 503 and PayPal retries. |
+| `RAZORPAY_KEY_ID` | for Razorpay | none | — | Razorpay public key id. Safe to expose to the checkout modal. |
+| `RAZORPAY_KEY_SECRET` | for Razorpay | none | — | Razorpay key secret. Server-only — used for order creation, checkout-signature verification and payment fetches; never reaches client JavaScript. |
+| `RAZORPAY_WEBHOOK_SECRET` | for webhooks | none | — | Webhook secret for `POST /api/webhooks/razorpay` HMAC-SHA256 signature verification. |
+
+Runtime diagnostics: `/api/system` (and Settings → System) report checkout
+availability honestly — configured providers and PayPal mode, or an explicit
+"not configured" warning. Unconfigured providers are hidden or disabled on
+`/buy`; the page never pretends checkout works.
 
 ## Related knobs that are NOT environment variables
 

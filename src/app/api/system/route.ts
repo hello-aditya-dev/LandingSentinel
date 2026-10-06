@@ -2,6 +2,9 @@ import { ok, route, serverLog } from "@/lib/api/envelope";
 import { PRODUCT } from "@/config/product";
 import { db } from "@/lib/db";
 import { authModeActive, isPasswordHashConfigured } from "@/lib/auth";
+import { resolveSiteUrl } from "@/lib/site-url";
+import { getPayPalConfig } from "@/lib/services/paypal";
+import { getRazorpayConfig } from "@/lib/services/razorpay";
 
 export const runtime = "nodejs";
 
@@ -80,6 +83,49 @@ async function runChecks(): Promise<Check[]> {
     status: "ok",
     detail: process.env.NODE_ENV === "production" ? "Production" : "Development",
   });
+
+  // Site URL configuration (canonical metadata — see CONFIGURATION.md)
+  const siteUrl = resolveSiteUrl();
+  if (process.env.NEXT_PUBLIC_SITE_URL?.trim()) {
+    checks.push({
+      name: "Site URL",
+      status: "ok",
+      detail: `Configured (NEXT_PUBLIC_SITE_URL) — ${siteUrl}`,
+    });
+  } else if (siteUrl) {
+    checks.push({
+      name: "Site URL",
+      status: "warn",
+      detail: `Derived from the deployment URL (${siteUrl}) — set NEXT_PUBLIC_SITE_URL for canonical metadata`,
+    });
+  } else {
+    checks.push({
+      name: "Site URL",
+      status: "warn",
+      detail: "Not configured — absolute OG metadata is omitted. Set NEXT_PUBLIC_SITE_URL.",
+    });
+  }
+
+  // Checkout providers (never report configured when credentials are absent)
+  const payPal = getPayPalConfig();
+  const razorpay = getRazorpayConfig();
+  const checkoutProviders = [
+    payPal ? `PayPal (${payPal.env})` : null,
+    razorpay ? "Razorpay" : null,
+  ].filter(Boolean);
+  if (checkoutProviders.length > 0) {
+    checks.push({
+      name: "Checkout",
+      status: "ok",
+      detail: `${checkoutProviders.join(" + ")} configured — /buy can take payments`,
+    });
+  } else {
+    checks.push({
+      name: "Checkout",
+      status: "warn",
+      detail: "Not configured — /buy shows checkout unavailable. Set PAYPAL_* / RAZORPAY_* (see CONFIGURATION.md).",
+    });
+  }
 
   return checks;
 }

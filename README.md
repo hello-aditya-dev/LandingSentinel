@@ -1,6 +1,6 @@
 # LandingSentinel
 
-Paid-media landing-page preflight. Version 0.1.2 — see [CHANGELOG.md](CHANGELOG.md).
+Paid-media landing-page preflight. Version 0.1.4 — see [CHANGELOG.md](CHANGELOG.md).
 
 Try the product with **no account**: the synthetic campaign demo runs the
 full workflow (import → preflight → evidence → report → after-fixes), and the
@@ -52,7 +52,7 @@ question that matters first: how much money points at broken pages.
 
 ## Requirements
 
-- Node.js 20 or newer (Node 24 recommended)
+- Node.js 20.9 or newer (Node 24 recommended)
 - npm for installs and commands (`package-lock.json` is committed, so
   `npm install` is the supported, reproducible path)
 - A PostgreSQL database — hosted (Neon, Supabase, RDS) or self-hosted.
@@ -62,7 +62,9 @@ question that matters first: how much money points at broken pages.
 
 ## Quick start
 
-The verified fresh-install flow (canonical buyer path):
+New here? **[QUICKSTART.md](QUICKSTART.md) is the canonical buyer path** —
+install, environment, database, verification and first login, kept to one or
+two pages. The condensed version:
 
 ```
 # 1. Provision a PostgreSQL database and copy its connection string, e.g.
@@ -232,8 +234,15 @@ the scoring rules.
 
 ## Documentation
 
+Start here: new buyers should read [QUICKSTART.md](QUICKSTART.md) first —
+it takes you from download to a signed-in workspace without any other
+reading. When something misbehaves, go straight to
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md). The full map:
+
 | Document | Contents |
 | --- | --- |
+| [QUICKSTART.md](QUICKSTART.md) | New buyers: install, environment, admin password, database, verification, first sign-in, minimal Vercel deploy. |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common problems — database, login, scanner, imports, reports, rate limits — each as symptom / likely cause / fix. |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Zero to deployed: install, environment, PostgreSQL, migrations, Vercel, health checks, verifying the real scanner locally. |
 | [CONFIGURATION.md](CONFIGURATION.md) | Every environment variable, defaults, and which values are build-time. |
 | [BRANDING.md](BRANDING.md) | White-label options, where to set them, precedence rules. |
@@ -241,7 +250,8 @@ the scoring rules.
 | [SECURITY.md](SECURITY.md) | SSRF protection, redirect policy, limits, single-admin access control, known limitations. |
 | [DATA-HANDLING.md](DATA-HANDLING.md) | Exactly what is stored, requested and logged — and what never happens. |
 | [CHANGELOG.md](CHANGELOG.md) | Release history. |
-| [LICENSE.md](LICENSE.md) | The commercial licence text. |
+| [LICENSE-SUMMARY.md](LICENSE-SUMMARY.md) | Licence in plain English — what you may and may not do with the source code. |
+| [LICENSE.md](LICENSE.md) | The full legal-style commercial licence text. |
 
 Sample campaign CSV exports live in [sample-data/](sample-data/) — three
 synthetic platform exports on the reserved `.test` top-level domain, plus

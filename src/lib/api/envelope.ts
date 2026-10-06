@@ -28,6 +28,8 @@ export type ApiErrorCode =
   | "AUTH_REQUIRED"
   | "AUTH_CONFIG_MISSING"
   | "AUTH_INVALID_CREDENTIALS"
+  | "PAYMENT_UNAVAILABLE"
+  | "PAYMENT_FAILED"
   | "SERVER_FAILURE";
 
 export class ApiError extends Error {

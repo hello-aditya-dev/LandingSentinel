@@ -291,6 +291,27 @@ export function DemoView({ panel }: { panel?: "fixed" | "branding" }) {
           </Sheet>
         ) : null}
 
+        {/* ---------------- COMMERCIAL CTA after the verdict ---------------- */}
+        {!isLoading && hasResults && !scanning ? (
+          <div className="border border-ink bg-paper-raised px-4 py-5 sm:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="max-w-xl">
+                <h3 className="font-display text-lg font-bold tracking-tight">
+                  Put this under your agency&apos;s brand
+                </h3>
+                <p className="mt-1 text-[13.5px] leading-relaxed text-ink-2">
+                  Get the complete source and the Agency Commercial Licence — £349 once. Every view
+                  you just used — the import, the Money Map, the evidence, the report — ships as
+                  white-label source you deploy yourself.
+                </p>
+              </div>
+              <Button size="lg" onClick={() => navigate({ view: "buy" })} className="gap-2 rounded-[2px] px-6 py-3">
+                Buy Agency Licence <ArrowRight size={16} aria-hidden="true" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
         {/* The actual product surface, demo-scoped (progress while running,
             FIX THESE FIRST Money Map once complete) */}
         {isLoading || !activeScanId ? (

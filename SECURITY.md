@@ -309,3 +309,48 @@ per-instance limits are not a hard distributed guarantee — configure a
 platform-level rate rule (Vercel Firewall on `POST /api/public/scan`, keyed
 by client IP) where available; see DEPLOYMENT.md §8 for the recommended
 scope and the honest limitation for plans without Firewall access.
+
+## Commercial checkout (`/buy`, 0.1.4)
+
+The purchase flow is engineered so the browser is never authoritative about
+money:
+
+- **Amounts** are fixed integer minor units resolved from server
+  configuration (`LANDINGSENTINEL_PRICE_GBP_MINOR`, default 34900;
+  `LANDINGSENTINEL_PRICE_INR_MINOR` for the India price). The request
+  schemas (`src/lib/services/purchase-schema.ts`) are strict zod objects —
+  a client sending `status`, `amountMinor`, `currency` or `productSku`
+  fields is rejected with `INVALID_INPUT`, so no client input can ever
+  reach the purchase record's authoritative fields.
+- **The paid state** is reachable only through
+  `markPurchasePaidIfVerified()` (src/lib/services/purchases.ts), which is
+  invoked exclusively from server-side provider verification: the PayPal
+  capture result, the Razorpay HMAC checkout signature plus a server-side
+  payment fetch, or an authenticated webhook. Every transition re-checks
+  provider, amount, currency and SKU; mismatches are rejected and the
+  purchase stays pending.
+- **Idempotency:** duplicate webhook deliveries and confirm calls are
+  no-op successes; unique constraints on `providerOrderId` /
+  `providerPaymentId` make one provider payment unable to mark two
+  purchase records paid.
+- **Secrets:** `PAYPAL_CLIENT_SECRET`, `RAZORPAY_KEY_SECRET` and
+  `RAZORPAY_WEBHOOK_SECRET` are server-only; the checkout page receives
+  only public configuration (availability, fixed prices, the Razorpay key
+  id). Card data is never handled by the deployment — hosted provider
+  checkouts only.
+- **Webhooks:** PayPal signatures are verified through PayPal's
+  verification API (transmission headers + configured `PAYPAL_WEBHOOK_ID`)
+  before any processing; Razorpay webhooks are verified as HMAC-SHA256 of
+  the raw body with `RAZORPAY_WEBHOOK_SECRET`. Unverifiable webhooks are
+  rejected; unconfigured deployments answer 503 so providers retry after
+  configuration.
+- **Abuse limits:** order creation (`POST /api/purchases`) is rate-limited
+  in memory — 6 per IP per hour plus a global hourly ceiling (the same
+  per-instance limitation as the other in-memory limiters above; add a
+  platform-level rule on Vercel Firewall where available).
+- **Receipts:** the purchase reference is an unguessable cuid acting as
+  the receipt token; the receipt endpoint reveals buyer identity only
+  once the record is server-verified paid. `/buy/success` renders a
+  confirmed state only after server verification.
+- The commercial source package is never exposed at a public URL —
+  fulfilment is manual and verified (docs/SALES-HANDOFF.md).

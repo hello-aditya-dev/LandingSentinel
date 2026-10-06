@@ -274,3 +274,96 @@ ships a deterministic fixture server and a matching CSV:
 5. **Remove the flag** from `.env.local` when you are done. The same
    verification runs automatically in the scanner integration test
    (`npm run test`) against a `*_test` database — see README.md → Testing.
+
+## 12. Commercial checkout (/buy)
+
+LandingSentinel sells the Agency Commercial Licence directly on its own
+`/buy` route — PayPal for international buyers, Razorpay for India. The
+full variable reference is in CONFIGURATION.md → "Commercial checkout";
+this section is the operational setup.
+
+**Security model (already built in):** every amount is a fixed integer
+minor-unit value resolved on the server; the browser never sends money,
+status, or product fields; orders are created and captured server-side;
+Razorpay signatures and PayPal webhooks are verified server-side; purchase
+records only become `paid` through verified provider data, idempotently;
+secrets never leave the server; no card data ever touches the deployment.
+
+### 12.1 Configure the prices
+
+```
+LANDINGSENTINEL_PRICE_GBP_MINOR=34900      # £349 — canonical, default
+LANDINGSENTINEL_PRICE_INR_MINOR=           # your India sticker price (paise)
+```
+
+The GBP price is never recalculated. The INR price is a separate fixed
+sticker price you select — Razorpay stays unavailable until it is set.
+
+### 12.2 PayPal (international)
+
+1. Create a REST API app in the PayPal Developer Dashboard (start with the
+   **sandbox** credentials).
+2. Set in the deployment environment:
+
+   ```
+   PAYPAL_CLIENT_ID=…
+   PAYPAL_CLIENT_SECRET=…
+   PAYPAL_ENV=sandbox
+   PAYPAL_WEBHOOK_ID=…
+   ```
+
+3. In the dashboard, add a **Webhook** for the app and subscribe to at
+   least `Payment capture completed` (`PAYMENT.CAPTURE.COMPLETED`) and
+   optionally `Checkout order completed`. Point the webhook URL at your
+   deployment:
+
+   ```
+   https://your-domain.example/api/webhooks/paypal
+   ```
+
+4. Copy the resulting webhook id into `PAYPAL_WEBHOOK_ID`.
+5. Redeploy (env changes require a redeploy on Vercel). `/api/system`
+   should now report `Checkout: PayPal (sandbox) configured`.
+6. **Going live:** switch `PAYPAL_ENV=live` and replace the credentials
+   with live keys from the same dashboard (Apps & Credentials → Live).
+   Re-register the webhook against the live endpoint if the ids differ,
+   update `PAYPAL_WEBHOOK_ID`, redeploy, and run one live-mode test before
+   announcing.
+
+### 12.3 Razorpay (India)
+
+1. Create a Razorpay account and get the **Test** keys (Settings → API
+   Keys).
+2. Set in the deployment environment:
+
+   ```
+   RAZORPAY_KEY_ID=…
+   RAZORPAY_KEY_SECRET=…
+   RAZORPAY_WEBHOOK_SECRET=…
+   LANDINGSENTINEL_PRICE_INR_MINOR=…
+   ```
+
+3. In Settings → Webhooks, add a webhook for the event
+   `payment.captured` pointing at:
+
+   ```
+   https://your-domain.example/api/webhooks/razorpay
+   ```
+
+   Enter a webhook secret and use the same value for
+   `RAZORPAY_WEBHOOK_SECRET`.
+4. Redeploy. `/api/system` should report Razorpay as configured.
+5. **Going live:** replace the test keys with Live keys, update the
+   webhook secret to the live webhook's secret, redeploy, and run one
+   live-mode test before announcing.
+
+### 12.4 Fulfilment
+
+Purchases appear in the `Purchase` table (`status: pending | paid | failed
+| refunded`, `fulfillmentStatus: pending | delivered`). For the first
+commercial release, delivery is manual and verified: follow
+`docs/SALES-HANDOFF.md` — verify the record is `paid` (server-verified
+only, never a buyer screenshot), email the source package with the licence
+and QUICKSTART.md, then record `fulfillmentStatus: delivered`. The
+commercial source package is never exposed at a public URL.
+

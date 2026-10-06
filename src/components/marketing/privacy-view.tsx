@@ -35,6 +35,12 @@ export function PrivacyView() {
               structured evidence) are stored per destination. Reports store a snapshot of your branding at
               generation time.
             </p>
+            <p>
+              If you buy a licence on this deployment, the purchase record additionally stores the buyer details from
+              the checkout form (name, business name, business email, country, optional website), the provider,
+              order/payment identifiers, the amount in integer minor units and the fulfilment state — for delivery,
+              support and refunds only. Card data never touches this deployment; it stays with PayPal or Razorpay.
+            </p>
           </div>
         </Sheet>
 

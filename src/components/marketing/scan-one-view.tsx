@@ -471,20 +471,9 @@ function ResultCard({ result, navigate }: { result: EvaluationResult; navigate: 
             <Button size="sm" onClick={() => navigate({ view: "demo" })} className="gap-2">
               See the full campaign demo <ArrowRight size={13} aria-hidden="true" />
             </Button>
-            {PRODUCT.checkoutUrl ? (
-              <a
-                href={PRODUCT.checkoutUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-9 items-center gap-2 rounded-[2px] border border-hairline-strong bg-paper px-4 text-[13px] font-medium text-ink transition-colors hover:bg-paper-deep"
-              >
-                Get the source — £349
-              </a>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => navigate({ view: "license" })} className="gap-2">
-                Get the source — £349
-              </Button>
-            )}
+            <Button size="sm" variant="outline" onClick={() => navigate({ view: "buy" })} className="gap-2">
+              Get the source — £349
+            </Button>
           </div>
         </div>
       </Sheet>
